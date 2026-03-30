@@ -457,7 +457,7 @@ The framework includes several built-in commands to demonstrate different patter
 | `add` | Sync | Add two numbers | `{"cmd":"add","args":{"a":3,"b":4}}` |
 | `upper` | Sync | Convert to uppercase | `{"cmd":"upper","args":{"text":"hello"}}` |
 | `slow_task` | Async | Simulate slow operation | `{"cmd":"slow_task","args":{"ms":2000}}` |
-| `call_shell` | Async | Execute shell command | `{"cmd":"call_shell","args":{"command":"ls"}}` |
+| `call_shell` | Async | Execute shell command | `{"cmd":"call_shell","args":{"command":"cat /etc/*release"}}` |
 
 ### call_shell Command
 
@@ -479,17 +479,17 @@ The `call_shell` command executes shell commands on the host system:
 
 ```bash
 # Windows CLI
-build\cpp_cli.exe --cmd call_shell --args "{\"command\":\"dir /B\"}" --human
+build\cpp_cli.exe --cmd call_shell --args "{\"command\":\"where cmd\"}" --human
 build\cpp_cli.exe --cmd call_shell --args "{\"command\":\"echo Hello\"}" --human
 
 # Linux CLI
-./build/cpp_cli --cmd call_shell --args '{"command":"ls -la"}' --human
+./build/cpp_cli --cmd call_shell --args '{"command":"cat /etc/*release"}' --human
 ./build/cpp_cli --cmd call_shell --args '{"command":"pwd"}' --human
 
 # Via HTTP API (requires token when accessed via web)
 curl -X POST http://localhost:8080/post/run \
   -H "Content-Type: application/json" \
-  -d '{"cmd":"call_shell","args":{"command":"echo Hello"},"token":"your_token_here"}'
+  -d '{"cmd":"call_shell","args":{"command":"cat /etc/*release"},"token":"your_token_here"}'
 ```
 
 **Security Features:** 🔒

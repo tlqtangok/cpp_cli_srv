@@ -44,13 +44,13 @@ build\cpp_srv.exe --token mytoken123
 # Without token - REJECTED
 curl -X POST http://localhost:8080/post/run \
   -H "Content-Type: application/json" \
-  -d '{"cmd":"call_shell","args":{"command":"ls"}}'
+  -d '{"cmd":"call_shell","args":{"command":"cat /etc/*release"}}'
 # Response: {"code":6,"error":"call_shell requires valid token","output":""}
 
 # With token - ACCEPTED
 curl -X POST http://localhost:8080/post/run \
   -H "Content-Type: application/json" \
-  -d '{"cmd":"call_shell","args":{"command":"ls"},"token":"mytoken123"}'
+  -d '{"cmd":"call_shell","args":{"command":"cat /etc/*release"},"token":"mytoken123"}'
 # Response: {"code":0,"error":"","output":"..."}
 ```
 

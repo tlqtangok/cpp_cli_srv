@@ -105,12 +105,20 @@ inline void register_all(Engine& e)
     //   - Adding authentication/authorization
     //
     // Examples:
-    //   Windows: {"cmd":"call_shell","args":{"command":"dir"}}
-    //   Linux:   {"cmd":"call_shell","args":{"command":"ls -la"}}
+    //   Windows: {"cmd":"call_shell","args":{"command":"where cmd"}}
+    //   Linux:   {"cmd":"call_shell","args":{"command":"cat /etc/*release"}}
     // -------------------------------------------------------------------------
+    
+    // Set platform-specific default example command
+    #ifdef _WIN32
+        std::string default_shell_cmd = "where cmd";
+    #else
+        std::string default_shell_cmd = "cat /etc/*release";
+    #endif
+    
     e.reg_async(
         { "call_shell", "Execute a shell command (Windows: CMD, Linux: bash)",
-          { {"command", "shell command to execute", true} },
+          { {"command", "shell command to execute", true, default_shell_cmd} },
           /* is_async = */ true },
         [](const json& args) -> std::future<Result>
         {
