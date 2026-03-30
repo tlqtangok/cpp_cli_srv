@@ -34,17 +34,17 @@ struct CmdDef
 };
 
 // ---------------------------------------------------------------------------
-// Result
+// Result - Unified response format
 // ---------------------------------------------------------------------------
 struct Result
 {
-    bool        ok      = true;
-    std::string message;
-    json        data;
+    int         code    = 0;        // 0 = success, non-zero = error
+    std::string output;             // result data or message
+    std::string error;              // error message (empty if code == 0)
 
     json to_json() const
     {
-        return { {"ok", ok}, {"message", message}, {"data", data} };
+        return { {"code", code}, {"output", output}, {"error", error} };
     }
 };
 
@@ -106,7 +106,7 @@ public:
             std::shared_lock<std::shared_mutex> lock(mutex_);
             auto it = handlers_.find(cmd);
             if (it == handlers_.end())
-                return { false, "unknown command: " + cmd };
+                return { 1, "", "unknown command: " + cmd };
             handler  = it->second;
             auto dit = def_map_.find(cmd);
             if (dit != def_map_.end()) is_async = dit->second.is_async;
@@ -121,7 +121,7 @@ public:
                 // Real async: respect timeout
                 auto status = fut.wait_for(timeout);
                 if (status == std::future_status::timeout)
-                    return { false, "command timed out after " +
+                    return { 2, "", "command timed out after " +
                              std::to_string(timeout.count()) + "ms" };
             }
             // Deferred (sync-wrapped) or ready async
@@ -129,7 +129,7 @@ public:
         }
         catch (const std::exception& ex)
         {
-            return { false, std::string("error: ") + ex.what() };
+            return { 3, "", std::string("exception: ") + ex.what() };
         }
     }
 

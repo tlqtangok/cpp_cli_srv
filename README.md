@@ -156,15 +156,19 @@ Exit code is `0` on success, `1` on any error — pipeline-safe.
 | **Linux** | `./build/cpp_srv --no-ipv6` | IPv4 only |
 | **Windows** | `build\cpp_srv.exe --log server.log` | Enable file logging |
 | **Linux** | `./build/cpp_srv --log server.log` | Enable file logging |
+| **Windows** | `build\cpp_srv.exe --token mytoken123` | Set token for call_shell security |
+| **Linux** | `./build/cpp_srv --token mytoken123` | Set token for call_shell security |
+
+> **Security Note:** The `--token` parameter enables authentication for the `call_shell` command. Token must be at least 2 characters and contain only alphanumeric characters and underscores. If no token is provided, `call_shell` will be disabled via the web interface.
 
 ### Combined options example:
 
 ```bash
 # Windows
-build\cpp_srv.exe --port 8080 --threads 8 --log server.log
+build\cpp_srv.exe --port 8080 --threads 8 --log server.log --token secure_token_123
 
 # Linux
-./build/cpp_srv --port 8080 --threads 8 --log server.log
+./build/cpp_srv --port 8080 --threads 8 --log server.log --token secure_token_123
 ```
 
 On startup the server prints:
@@ -276,6 +280,8 @@ Open `http://localhost:8080` — it reads `/get/schema` on load and auto-builds 
 |-----------|---------|-------|-------------|
 | **CLI tests** | `test_cli.bat` | `./test_cli.sh` | CLI smoke tests (no server needed) |
 | **API tests** | Start server, then `test_server.bat` | Start server, then `./test_server.sh` | REST API tests |
+| **Shell tests** | `test_shell.bat` | `./test_shell.sh` | Test call_shell command |
+| **Token tests** | `test_token.bat` | `./test_token.sh` | Token authentication tests |
 | **Concurrency** | `test_concurrent.bat` | `./test_comprehensive.sh` | Concurrency & timeout tests |
 | **IPv6 tests** | `test_ipv6.bat` | (included in test_server.sh) | Dual-stack IPv4/IPv6 tests |
 | **Logging tests** | - | `./test_logging.sh` | Server logging verification |
@@ -439,6 +445,83 @@ struct ArgDef {
 
 ---
 
+## Built-in Commands
+
+The framework includes several built-in commands to demonstrate different patterns:
+
+### Standard Commands
+
+| Command | Type | Description | Example |
+|---------|------|-------------|---------|
+| `echo` | Sync | Return text as-is | `{"cmd":"echo","args":{"text":"hello"}}` |
+| `add` | Sync | Add two numbers | `{"cmd":"add","args":{"a":3,"b":4}}` |
+| `upper` | Sync | Convert to uppercase | `{"cmd":"upper","args":{"text":"hello"}}` |
+| `slow_task` | Async | Simulate slow operation | `{"cmd":"slow_task","args":{"ms":2000}}` |
+| `call_shell` | Async | Execute shell command | `{"cmd":"call_shell","args":{"command":"ls"}}` |
+
+### call_shell Command
+
+The `call_shell` command executes shell commands on the host system:
+
+**Platform behavior:**
+- **Windows**: Runs commands via `cmd.exe /c <command>`
+- **Linux**: Runs commands directly in bash shell
+
+**Arguments:**
+- `command` (required): The shell command to execute
+
+**Returns:**
+- `output`: Command output (stdout + stderr combined)
+- `exit_code`: Command exit code (0 = success)
+- `command`: Echo of the executed command
+
+**Examples:**
+
+```bash
+# Windows CLI
+build\cpp_cli.exe --cmd call_shell --args "{\"command\":\"dir /B\"}" --human
+build\cpp_cli.exe --cmd call_shell --args "{\"command\":\"echo Hello\"}" --human
+
+# Linux CLI
+./build/cpp_cli --cmd call_shell --args '{"command":"ls -la"}' --human
+./build/cpp_cli --cmd call_shell --args '{"command":"pwd"}' --human
+
+# Via HTTP API (requires token when accessed via web)
+curl -X POST http://localhost:8080/post/run \
+  -H "Content-Type: application/json" \
+  -d '{"cmd":"call_shell","args":{"command":"echo Hello"},"token":"your_token_here"}'
+```
+
+**Security Features:** 🔒
+
+When using `call_shell` via the web interface (HTTP API):
+- **Token authentication required**: Server must be started with `--token <token>` parameter
+- **Token format**: Minimum 2 characters, alphanumeric + underscore only
+- **Token validation**: Every web request to `call_shell` must include the token
+- **CLI bypass**: Token not required for CLI usage (trusted local execution)
+- **Auto-prompt**: Web GUI automatically prompts for token on first use
+- **Token caching**: Web GUI caches token in sessionStorage for the session
+
+**Additional Security Warning:** ⚠️
+
+The `call_shell` command executes arbitrary shell commands. In production environments:
+- Always use a strong, random token (e.g., `openssl rand -hex 16`)
+- Run server with restricted user permissions
+- Consider network isolation or firewall rules
+- Whitelist allowed commands if possible
+- Sanitize user input
+- Monitor and log all shell command executions
+- Consider disabling this command entirely if not needed
+
+**Testing:**
+
+| Platform | Test Script |
+|----------|-------------|
+| **Windows** | `test_shell.bat` |
+| **Linux** | `./test_shell.sh` |
+
+---
+
 ## Platform Differences
 
 | Aspect | Windows | Linux |
@@ -491,7 +574,39 @@ struct ArgDef {
 | **IPv6 warnings** | Both | Use `--no-ipv6` flag or ignore (falls back to IPv4) |
 | **Build errors** | Windows | Try `build_debug.bat` for verbose output |
 | **Build errors** | Linux | Check CMake version: `cmake --version` (need 3.14+) |
+| **Permission denied errors** | Linux | Run `./fix_permissions.sh` then rebuild |
 | **Server can't find web/index.html** | Both | Run server from `build/` directory |
+
+### Permission Denied Errors
+
+If you get `make[2]: stat: Permission denied` errors after copying the project to another machine:
+
+**Problem**: Files were copied without proper read permissions.
+
+**Solution**:
+```bash
+# Quick fix - run the provided script
+./fix_permissions.sh
+
+# Or manually:
+find . -type d -exec chmod 755 {} \;  # Directories
+find . -type f -exec chmod 644 {} \;  # Files
+chmod +x *.sh                          # Scripts
+
+# Then rebuild
+./build.sh
+```
+
+**Prevention**: When copying the project, use:
+```bash
+# Preserve permissions
+cp -rp source/ destination/
+
+# Or use tar
+tar czf project.tar.gz cpp_cli_srv/
+# On target machine:
+tar xzf project.tar.gz
+```
 
 ---
 

@@ -3,6 +3,10 @@
 #include <thread>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
+#include <memory>
+#include <array>
+#include <sstream>
 
 // Register all commands here.
 // Both CLI and Web Server call register_all() - zero duplication.
@@ -21,7 +25,7 @@ inline void register_all(Engine& e)
         [](const json& args) -> Result
         {
             std::string text = args.value("text", "");
-            return { true, "ok", { {"result", text} } };
+            return { 0, text, "" };
         }
     );
 
@@ -35,7 +39,8 @@ inline void register_all(Engine& e)
         {
             double a = args.at("a").get<double>();
             double b = args.at("b").get<double>();
-            return { true, "ok", { {"result", a + b} } };
+            double result = a + b;
+            return { 0, std::to_string(result), "" };
         }
     );
 
@@ -49,7 +54,7 @@ inline void register_all(Engine& e)
         {
             std::string s = args.value("text", "");
             for (auto& c : s) c = (char)toupper((unsigned char)c);
-            return { true, "ok", { {"result", s} } };
+            return { 0, s, "" };
         }
     );
 
@@ -77,7 +82,99 @@ inline void register_all(Engine& e)
             return std::async(std::launch::async, [ms]() -> Result
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(ms));
-                return { true, "ok", { {"result", "done"}, {"slept_ms", ms} } };
+                json result;
+                result["slept_ms"] = ms;
+                result["status"] = "done";
+                return { 0, result.dump(), "" };
+            });
+        }
+    );
+
+    // -------------------------------------------------------------------------
+    // call_shell - ASYNC command execution
+    //
+    // Executes shell commands on the host system:
+    //   - Windows: runs as CMD command (e.g., "dir", "type file.txt")
+    //   - Linux:   runs as bash command (e.g., "ls", "cat file.txt")
+    //
+    // Security Warning: This command executes arbitrary shell commands.
+    // In production, consider:
+    //   - Whitelisting allowed commands
+    //   - Input sanitization
+    //   - Running with restricted user permissions
+    //   - Adding authentication/authorization
+    //
+    // Examples:
+    //   Windows: {"cmd":"call_shell","args":{"command":"dir"}}
+    //   Linux:   {"cmd":"call_shell","args":{"command":"ls -la"}}
+    // -------------------------------------------------------------------------
+    e.reg_async(
+        { "call_shell", "Execute a shell command (Windows: CMD, Linux: bash)",
+          { {"command", "shell command to execute", true} },
+          /* is_async = */ true },
+        [](const json& args) -> std::future<Result>
+        {
+            std::string command = args.value("command", "");
+            
+            return std::async(std::launch::async, [command]() -> Result
+            {
+                if (command.empty()) {
+                    return { 1, "", "command argument is required" };
+                }
+
+                // Platform-specific command execution
+                std::string full_command;
+                #ifdef _WIN32
+                    // Windows: use cmd.exe
+                    full_command = "cmd.exe /c " + command + " 2>&1";
+                #else
+                    // Linux/Unix: use bash
+                    full_command = command + " 2>&1";
+                #endif
+
+                // Execute command and capture output
+                std::array<char, 128> buffer;
+                std::string output;
+                int exit_code = 0;
+                
+                try {
+                    #ifdef _WIN32
+                        FILE* pipe = _popen(full_command.c_str(), "r");
+                    #else
+                        FILE* pipe = popen(full_command.c_str(), "r");
+                    #endif
+                    
+                    if (!pipe) {
+                        return { 2, "", "failed to execute command" };
+                    }
+
+                    // Read command output
+                    while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
+                        output += buffer.data();
+                    }
+
+                    // Get exit code
+                    #ifdef _WIN32
+                        exit_code = _pclose(pipe);
+                    #else
+                        exit_code = pclose(pipe);
+                    #endif
+
+                    // Return result
+                    json result_data;
+                    result_data["command"] = command;
+                    result_data["exit_code"] = exit_code;
+                    result_data["stdout"] = output;
+                    
+                    if (exit_code == 0) {
+                        return { 0, result_data.dump(), "" };
+                    } else {
+                        return { exit_code, result_data.dump(), "command failed with exit code " + std::to_string(exit_code) };
+                    }
+                    
+                } catch (const std::exception& e) {
+                    return { 3, "", std::string("exception: ") + e.what() };
+                }
             });
         }
     );

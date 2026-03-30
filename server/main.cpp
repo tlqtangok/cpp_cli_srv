@@ -79,7 +79,8 @@ static void mount_routes(httplib::Server& svr,
                          Engine&          e,
                          std::atomic<int>& active,
                          size_t           threads,
-                         Logger&          logger)
+                         Logger&          logger,
+                         const std::string& token)
 {
     // -------------------------------------------------------------------------
     // GET /get/schema
@@ -95,8 +96,9 @@ static void mount_routes(httplib::Server& svr,
     // -------------------------------------------------------------------------
     // POST /post/run
     // Body: { "cmd": "...", "args": {...}, "timeout_ms": 5000 }
+    // For "call_shell" command: { "cmd": "call_shell", "args": {...}, "token": "..." }
     // -------------------------------------------------------------------------
-    svr.Post("/post/run", [&e, &active, &logger](const httplib::Request& req, httplib::Response& res)
+    svr.Post("/post/run", [&e, &active, &logger, &token](const httplib::Request& req, httplib::Response& res)
     {
         std::string client_ip = get_client_ip(req);
         std::string resp_body;
@@ -126,9 +128,7 @@ static void mount_routes(httplib::Server& svr,
 
             if (cmd.empty())
             {
-                json err = { {"ok",false},
-                            {"message","missing 'cmd' field"},
-                            {"data",nullptr} };
+                json err = { {"code", 1}, {"output", ""}, {"error", "missing 'cmd' field"} };
                 resp_body = err.dump();
                 status = 400;
                 json_resp(res, err, status);
@@ -136,17 +136,43 @@ static void mount_routes(httplib::Server& svr,
                 return;
             }
 
+            // Security check: call_shell requires token verification
+            if (cmd == "call_shell")
+            {
+                if (!token.empty())
+                {
+                    std::string req_token = body.value("token", "");
+                    if (req_token != token)
+                    {
+                        json err = { {"code", 6}, {"output", ""}, {"error", "call_shell requires valid token"} };
+                        resp_body = err.dump();
+                        status = 403;
+                        json_resp(res, err, status);
+                        logger.log_request("POST", "/post/run", client_ip, req.body, status, resp_body);
+                        return;
+                    }
+                }
+                // If no token configured on server, call_shell is disabled
+                else
+                {
+                    json err = { {"code", 6}, {"output", ""}, {"error", "call_shell is disabled (no token configured)"} };
+                    resp_body = err.dump();
+                    status = 403;
+                    json_resp(res, err, status);
+                    logger.log_request("POST", "/post/run", client_ip, req.body, status, resp_body);
+                    return;
+                }
+            }
+
             Result r = e.run(cmd, args, std::chrono::milliseconds(tms));
             resp_body = r.to_json().dump();
-            status = r.ok ? 200 : 400;
+            status = r.code == 0 ? 200 : 400;
             json_resp(res, r.to_json(), status);
             logger.log_request("POST", "/post/run", client_ip, req.body, status, resp_body);
         }
         catch (const json::exception& ex)
         {
-            json err = { {"ok",false},
-                        {"message", std::string("JSON parse error: ") + ex.what()},
-                        {"data",nullptr} };
+            json err = { {"code", 4}, {"output", ""}, {"error", std::string("JSON parse error: ") + ex.what()} };
             resp_body = err.dump();
             status = 400;
             json_resp(res, err, status);
@@ -154,9 +180,7 @@ static void mount_routes(httplib::Server& svr,
         }
         catch (const std::exception& ex)
         {
-            json err = { {"ok",false},
-                        {"message", ex.what()},
-                        {"data",nullptr} };
+            json err = { {"code", 5}, {"output", ""}, {"error", ex.what()} };
             resp_body = err.dump();
             status = 500;
             json_resp(res, err, status);
@@ -170,12 +194,12 @@ static void mount_routes(httplib::Server& svr,
     svr.Get("/get/status", [&active, threads, &logger](const httplib::Request& req, httplib::Response& res)
     {
         std::string client_ip = get_client_ip(req);
-        json body = {
-            {"ok",      true},
+        json status_data = {
             {"threads", (int)threads},
             {"active",  active.load()},
-            {"message", "running"}
+            {"status", "running"}
         };
+        json body = { {"code", 0}, {"output", status_data.dump()}, {"error", ""} };
         json_resp(res, body);
         logger.log_request("GET", "/get/status", client_ip, "", 200, body.dump());
     });
@@ -212,6 +236,18 @@ static void mount_routes(httplib::Server& svr,
 }
 
 // ---------------------------------------------------------------------------
+// Token validation helper
+// ---------------------------------------------------------------------------
+static bool is_valid_token(const std::string& token)
+{
+    if (token.length() < 2) return false;
+    for (char c : token) {
+        if (!std::isalnum(c) && c != '_') return false;
+    }
+    return true;
+}
+
+// ---------------------------------------------------------------------------
 // make_server
 // Create and configure a server instance (thread pool + timeouts).
 // ---------------------------------------------------------------------------
@@ -241,6 +277,7 @@ int main(int argc, char* argv[])
     size_t      threads = THREAD_POOL_SIZE;
     bool        no_ipv6 = false;
     std::string logfile = "";
+    std::string token   = "";
 
     for (int i = 1; i < argc; ++i)
     {
@@ -249,6 +286,14 @@ int main(int argc, char* argv[])
         else if (flag == "--threads" && i+1 < argc) threads = (size_t)std::stoi(argv[++i]);
         else if (flag == "--no-ipv6")               no_ipv6 = true;
         else if (flag == "--log"     && i+1 < argc) logfile = argv[++i];
+        else if (flag == "--token"   && i+1 < argc) token   = argv[++i];
+    }
+
+    // Validate token if provided
+    if (!token.empty() && !is_valid_token(token))
+    {
+        std::cerr << "Error: token must be at least 2 characters and contain only letters, numbers, or underscore\n";
+        return 1;
     }
 
     if (threads == 0)
@@ -263,7 +308,7 @@ int main(int argc, char* argv[])
 
     // --- IPv4 server --------------------------------------------------------
     httplib::Server* svr4 = make_server(threads);
-    mount_routes(*svr4, e, active, threads, logger);
+    mount_routes(*svr4, e, active, threads, logger, token);
 
     if (!svr4->bind_to_port("0.0.0.0", port))
     {
@@ -288,7 +333,7 @@ int main(int argc, char* argv[])
         svr6 = make_server(threads);
         // IPV6_V6ONLY = true: bind only IPv6, don't overlap with IPv4
         svr6->set_ipv6_v6only(true);
-        mount_routes(*svr6, e, active, threads, logger);
+        mount_routes(*svr6, e, active, threads, logger, token);
 
         if (!svr6->bind_to_port("::", port))
         {

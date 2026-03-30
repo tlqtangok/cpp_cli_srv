@@ -47,7 +47,7 @@ int main(int argc, char* argv[])
         try { args = json::parse(args_str); }
         catch (...)
         {
-            std::cerr << "{\"ok\":false,\"message\":\"invalid JSON in --args\"}\n";
+            std::cerr << "{\"code\":1,\"output\":\"\",\"error\":\"invalid JSON in --args\"}\n";
             return 1;
         }
     }
@@ -57,13 +57,13 @@ int main(int argc, char* argv[])
 
     if (human_mode)
     {
-        std::cout << (r.ok ? "[OK] " : "[ERR] ") << r.message << "\n";
-        if (!r.data.is_null()) std::cout << r.data.dump(2) << "\n";
+        std::cout << (r.code == 0 ? "[OK] " : "[ERR] ") << (r.code == 0 ? r.output : r.error) << "\n";
+        if (!r.output.empty() && r.code == 0) std::cout << r.output << "\n";
     }
     else
     {
         std::cout << out.dump() << "\n";
     }
 
-    return r.ok ? 0 : 1;
+    return r.code == 0 ? 0 : 1;
 }

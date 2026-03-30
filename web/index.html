@@ -65,6 +65,9 @@
 <script>
 const API = '';   // 同源，无需前缀
 
+// Token storage for call_shell command
+let shellToken = sessionStorage.getItem('shell_token') || '';
+
 async function loadSchema() {
   try {
     const r = await fetch(API + '/get/schema');
@@ -107,15 +110,42 @@ async function runCmd() {
     try { args = JSON.parse(args_raw); }
     catch { box.className = 'result-box err'; box.textContent = 'invalid JSON in args'; return; }
   }
+
+  // For call_shell command, check if token is needed
+  let body = { cmd, args };
+  if (cmd === 'call_shell') {
+    if (!shellToken) {
+      shellToken = prompt('call_shell requires authentication. Please enter token:');
+      if (!shellToken) {
+        box.className = 'result-box err';
+        box.textContent = 'Token required for call_shell command';
+        return;
+      }
+      sessionStorage.setItem('shell_token', shellToken);
+    }
+    body.token = shellToken;
+  }
+
   try {
     const r = await fetch(API + '/post/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cmd, args })
+      body: JSON.stringify(body)
     });
     const data = await r.json();
-    box.className = 'result-box' + (data.ok ? '' : ' err');
-    box.textContent = JSON.stringify(data, null, 2);
+    
+    // Handle new JSON format: check "code" instead of "ok"
+    const isSuccess = data.code === 0;
+    box.className = 'result-box' + (isSuccess ? '' : ' err');
+    
+    // If authentication error (code 6), clear cached token
+    if (data.code === 6 && cmd === 'call_shell') {
+      shellToken = '';
+      sessionStorage.removeItem('shell_token');
+      box.textContent = 'Authentication failed. Token cleared.\n\n' + JSON.stringify(data, null, 2);
+    } else {
+      box.textContent = JSON.stringify(data, null, 2);
+    }
   } catch(e) {
     box.className = 'result-box err';
     box.textContent = 'fetch error: ' + e.message;

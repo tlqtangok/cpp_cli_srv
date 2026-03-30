@@ -14,17 +14,17 @@ $CLI --schema > /dev/null && echo "✓ --schema works"
 echo ""
 echo "Test 2: echo command"
 result=$($CLI --cmd echo --args '{"text":"hello"}')
-echo "$result" | grep -q '"result":"hello"' && echo "✓ echo command works"
+echo "$result" | grep -q '"code":0' && echo "$result" | grep -q '"output":"hello"' && echo "✓ echo command works"
 
 echo ""
 echo "Test 3: add command"
 result=$($CLI --cmd add --args '{"a":3,"b":4}')
-echo "$result" | grep -q '"result":7' && echo "✓ add command works"
+echo "$result" | grep -q '"code":0' && echo "$result" | grep -q '"output":"7' && echo "✓ add command works"
 
 echo ""
 echo "Test 4: upper command"
 result=$($CLI --cmd upper --args '{"text":"hello"}')
-echo "$result" | grep -q '"result":"HELLO"' && echo "✓ upper command works"
+echo "$result" | grep -q '"code":0' && echo "$result" | grep -q '"output":"HELLO"' && echo "✓ upper command works"
 
 echo ""
 echo "Test 5: human-readable output"
@@ -33,7 +33,7 @@ echo "$result" | grep -q '\[OK\]' && echo "✓ --human flag works"
 
 echo ""
 echo "Test 6: error case (unknown command)"
-if $CLI --cmd unknown --args '{}' 2>&1 | grep -q '"ok":false'; then
+if $CLI --cmd unknown --args '{}' 2>&1 | grep -q '"code":[1-9]'; then
     echo "✓ error handling works"
 else
     echo "✗ error handling failed"
