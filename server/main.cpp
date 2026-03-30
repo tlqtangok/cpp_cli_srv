@@ -314,7 +314,7 @@ int main(int argc, char* argv[])
 
     logger.log("Server ready - accepting connections");
     
-    std::cout << "=== mytool-server started ===\n"
+    std::cout << "=== cpp_srv started ===\n"
               << "  IPv4 : http://0.0.0.0:"     << port << "\n";
     if (svr6)
         std::cout << "  IPv6 : http://[::]:" << port << "\n";

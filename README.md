@@ -58,7 +58,7 @@ cpp_cli_srv/
 
 | Platform | Command | Output Binaries |
 |----------|---------|-----------------|
-| **Windows** | `build.bat` | `build\mytool-cli.exe`<br>`build\mytool-server.exe` |
+| **Windows** | `build.bat` | `build\cpp_cli.exe`<br>`build\cpp_srv.exe` |
 | **Linux** | `./build.sh` | `build/cpp_cli`<br>`build/cpp_srv` |
 
 ### What the build script does:
@@ -100,20 +100,20 @@ cpp_cli_srv/
 
 | Platform | Command | Description |
 |----------|---------|-------------|
-| **Windows** | `build\mytool-cli.exe --schema` | List all commands |
+| **Windows** | `build\cpp_cli.exe --schema` | List all commands |
 | **Linux** | `./build/cpp_cli --schema` | List all commands |
-| **Windows** | `build\mytool-cli.exe --cmd echo --args "{\"text\":\"hello\"}"` | Run command |
+| **Windows** | `build\cpp_cli.exe --cmd echo --args "{\"text\":\"hello\"}"` | Run command |
 | **Linux** | `./build/cpp_cli --cmd echo --args '{"text":"hello"}'` | Run command |
 
 ### Complete usage examples:
 
 ```bash
 # Windows (PowerShell / CMD)
-build\mytool-cli.exe --schema
-build\mytool-cli.exe --cmd echo  --args "{\"text\":\"hello\"}"
-build\mytool-cli.exe --cmd add   --args "{\"a\":3,\"b\":4}"
-build\mytool-cli.exe --cmd upper --args "{\"text\":\"hello\"}"
-build\mytool-cli.exe --cmd add --args "{\"a\":3,\"b\":4}" --human
+build\cpp_cli.exe --schema
+build\cpp_cli.exe --cmd echo  --args "{\"text\":\"hello\"}"
+build\cpp_cli.exe --cmd add   --args "{\"a\":3,\"b\":4}"
+build\cpp_cli.exe --cmd upper --args "{\"text\":\"hello\"}"
+build\cpp_cli.exe --cmd add --args "{\"a\":3,\"b\":4}" --human
 
 # Linux (Bash)
 ./build/cpp_cli --schema
@@ -146,22 +146,22 @@ Exit code is `0` on success, `1` on any error — pipeline-safe.
 
 | Platform | Command | Description |
 |----------|---------|-------------|
-| **Windows** | `build\mytool-server.exe` | Start on default port 8080 |
+| **Windows** | `build\cpp_srv.exe` | Start on default port 8080 |
 | **Linux** | `./build/cpp_srv` | Start on default port 8080 |
-| **Windows** | `build\mytool-server.exe --port 9090` | Custom port |
+| **Windows** | `build\cpp_srv.exe --port 9090` | Custom port |
 | **Linux** | `./build/cpp_srv --port 9090` | Custom port |
-| **Windows** | `build\mytool-server.exe --threads 8` | Custom thread count |
+| **Windows** | `build\cpp_srv.exe --threads 8` | Custom thread count |
 | **Linux** | `./build/cpp_srv --threads 8` | Custom thread count |
-| **Windows** | `build\mytool-server.exe --no-ipv6` | IPv4 only |
+| **Windows** | `build\cpp_srv.exe --no-ipv6` | IPv4 only |
 | **Linux** | `./build/cpp_srv --no-ipv6` | IPv4 only |
-| **Windows** | `build\mytool-server.exe --log server.log` | Enable file logging |
+| **Windows** | `build\cpp_srv.exe --log server.log` | Enable file logging |
 | **Linux** | `./build/cpp_srv --log server.log` | Enable file logging |
 
 ### Combined options example:
 
 ```bash
 # Windows
-build\mytool-server.exe --port 8080 --threads 8 --log server.log
+build\cpp_srv.exe --port 8080 --threads 8 --log server.log
 
 # Linux
 ./build/cpp_srv --port 8080 --threads 8 --log server.log
@@ -170,7 +170,7 @@ build\mytool-server.exe --port 8080 --threads 8 --log server.log
 On startup the server prints:
 
 ```
-=== mytool-server started ===
+=== cpp_srv started ===
   IPv4 : http://0.0.0.0:8080
   IPv6 : http://[::]:8080
   Threads : 20 per server
@@ -284,7 +284,7 @@ Open `http://localhost:8080` — it reads `/get/schema` on load and auto-builds 
 
 ```bash
 # Windows - Terminal 1
-build\mytool-server.exe
+build\cpp_srv.exe
 
 # Windows - Terminal 2
 test_server.bat
@@ -443,7 +443,7 @@ struct ArgDef {
 
 | Aspect | Windows | Linux |
 |--------|---------|-------|
-| **Binary names** | `mytool-cli.exe`, `mytool-server.exe` | `cpp_cli`, `cpp_srv` |
+| **Binary names** | `cpp_cli.exe`, `cpp_srv.exe` | `cpp_cli`, `cpp_srv` |
 | **Compiler** | MSVC (cl.exe) | g++ |
 | **Build system** | Direct cl.exe via batch | CMake + make |
 | **Compiler flags** | `/std:c++17 /EHsc /O2` | `-std=c++17 -O2 -Wall -Wextra` |

@@ -1,5 +1,5 @@
 @echo off
-set CLI=c:\Users\tlqta\WorkBuddy\Claw\cpp_cli_srv\build\mytool-cli.exe
+set CLI=c:\Users\tlqta\WorkBuddy\Claw\cpp_cli_srv\build\cpp_cli.exe
 
 echo === Test 1: echo (human) ===
 %CLI% --cmd echo --args "{\"text\":\"hello world\"}" --human
