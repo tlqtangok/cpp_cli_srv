@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>CLI-SRV GUI</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+  header { padding: 20px 32px; border-bottom: 1px solid #2d3748; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 1.3rem; color: #63b3ed; }
+  .container { display: flex; height: calc(100vh - 65px); }
+  .sidebar { width: 220px; border-right: 1px solid #2d3748; padding: 16px; overflow-y: auto; }
+  .sidebar h3 { font-size: .75rem; text-transform: uppercase; color: #718096; margin-bottom: 10px; letter-spacing: 1px; }
+  .cmd-btn { display: block; width: 100%; text-align: left; padding: 8px 12px; margin-bottom: 6px;
+    background: #1a202c; border: 1px solid #2d3748; border-radius: 6px; color: #e2e8f0;
+    cursor: pointer; font-size: .9rem; transition: background .15s; }
+  .cmd-btn:hover, .cmd-btn.active { background: #2b6cb0; border-color: #63b3ed; }
+  .main { flex: 1; padding: 24px 32px; display: flex; flex-direction: column; gap: 16px; overflow: auto; }
+  label { font-size: .8rem; color: #a0aec0; margin-bottom: 4px; display: block; }
+  textarea, input[type=text] {
+    width: 100%; padding: 10px 14px; background: #1a202c; border: 1px solid #2d3748;
+    border-radius: 6px; color: #e2e8f0; font-family: 'Consolas', monospace; font-size: .9rem;
+    resize: vertical; outline: none; transition: border .15s; }
+  textarea:focus, input:focus { border-color: #63b3ed; }
+  .row { display: flex; gap: 12px; align-items: flex-end; }
+  button#runBtn {
+    padding: 10px 28px; background: #2b6cb0; border: none; border-radius: 6px;
+    color: #fff; font-size: .95rem; cursor: pointer; transition: background .15s; white-space: nowrap; }
+  button#runBtn:hover { background: #2c5282; }
+  .result-box { flex: 1; background: #1a202c; border: 1px solid #2d3748; border-radius: 8px;
+    padding: 14px; font-family: 'Consolas', monospace; font-size: .85rem; white-space: pre-wrap;
+    overflow: auto; color: #68d391; min-height: 180px; }
+  .result-box.err { color: #fc8181; }
+  .tag { font-size: .7rem; padding: 2px 7px; border-radius: 10px; background: #2d3748; color: #a0aec0; }
+</style>
+</head>
+<body>
+<header>
+  <span style="font-size:1.4rem">⚡</span>
+  <h1>CLI-SRV Web GUI</h1>
+  <span class="tag" id="statusTag">connecting...</span>
+</header>
+<div class="container">
+  <div class="sidebar">
+    <h3>Commands</h3>
+    <div id="cmdList">loading...</div>
+  </div>
+  <div class="main">
+    <div>
+      <label>Command</label>
+      <input type="text" id="cmdInput" placeholder="e.g. echo" />
+    </div>
+    <div>
+      <label>Args (JSON)</label>
+      <textarea id="argsInput" rows="4" placeholder='{"text": "hello"}'></textarea>
+    </div>
+    <div class="row">
+      <button id="runBtn" onclick="runCmd()">▶ Run</button>
+      <label style="color:#718096;font-size:.8rem">Ctrl+Enter to run</label>
+    </div>
+    <label>Result</label>
+    <div class="result-box" id="result">— waiting —</div>
+  </div>
+</div>
+<script>
+const API = '';   // 同源，无需前缀
+
+async function loadSchema() {
+  try {
+    const r = await fetch(API + '/get/schema');
+    const cmds = await r.json();
+    const list = document.getElementById('cmdList');
+    list.innerHTML = '';
+    document.getElementById('statusTag').textContent = 'connected';
+    document.getElementById('statusTag').style.background = '#276749';
+    cmds.forEach(c => {
+      const btn = document.createElement('button');
+      btn.className = 'cmd-btn';
+      btn.title = c.desc;
+      btn.textContent = c.name;
+      btn.onclick = () => fillCmd(c);
+      list.appendChild(btn);
+    });
+  } catch(e) {
+    document.getElementById('statusTag').textContent = 'offline';
+    document.getElementById('statusTag').style.background = '#742a2a';
+  }
+}
+
+function fillCmd(c) {
+  document.getElementById('cmdInput').value = c.name;
+  const sample = {};
+  c.args.forEach(a => {
+    sample[a.name] = ('default' in a) ? a.default : (a.required ? `<${a.name}>` : '');
+  });
+  document.getElementById('argsInput').value = JSON.stringify(sample, null, 2);
+  document.querySelectorAll('.cmd-btn').forEach(b => b.classList.toggle('active', b.textContent === c.name));
+}
+
+async function runCmd() {
+  const cmd  = document.getElementById('cmdInput').value.trim();
+  const args_raw = document.getElementById('argsInput').value.trim();
+  const box  = document.getElementById('result');
+  if (!cmd) { box.textContent = 'please enter a command'; return; }
+  let args = {};
+  if (args_raw) {
+    try { args = JSON.parse(args_raw); }
+    catch { box.className = 'result-box err'; box.textContent = 'invalid JSON in args'; return; }
+  }
+  try {
+    const r = await fetch(API + '/post/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cmd, args })
+    });
+    const data = await r.json();
+    box.className = 'result-box' + (data.ok ? '' : ' err');
+    box.textContent = JSON.stringify(data, null, 2);
+  } catch(e) {
+    box.className = 'result-box err';
+    box.textContent = 'fetch error: ' + e.message;
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'Enter') runCmd();
+});
+
+loadSchema();
+</script>
+</body>
+</html>
