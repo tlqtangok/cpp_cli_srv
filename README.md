@@ -7,6 +7,8 @@ A minimal C++ framework that exposes the **same business logic** through two sur
 
 The key idea: you write a command **once** in `core/commands.h`. Both the CLI binary and the web server pick it up automatically.
 
+![Web UI](img/web_ui.png)
+
 ---
 
 ## Project Structure
@@ -26,44 +28,67 @@ cpp_cli_srv/
 │   ├── json.hpp          ← nlohmann/json (header-only)
 │   └── httplib.h         ← cpp-httplib  (header-only)
 ├── build/                ← Output directory (binaries + web copy)
-├── build.bat             ← One-command build (MSVC)
-├── build_debug.bat       ← Build with verbose error output
-├── test_cli.bat          ← CLI smoke tests
-├── test_server.bat       ← API smoke tests (requires running server)
-├── test_concurrent.bat   ← Concurrency & timeout tests
-└── test_ipv6.bat         ← IPv4 + IPv6 dual-stack tests
+├── CMakeLists.txt        ← CMake configuration for cross-platform build
+├── build.bat / build.sh  ← One-command build scripts
+└── test_*.bat / test_*.sh ← Test scripts
 ```
 
 ---
 
 ## Requirements
 
-| Item | Detail |
-|------|--------|
-| Compiler | MSVC (cl.exe) via Visual Studio 2022, x64 |
-| C++ standard | C++17 |
-| Dependencies | None — both libs are header-only, already in `third_party/` |
-| OS | Windows (httplib uses winsock2) |
+| Item | Windows | Linux/Ubuntu |
+|------|---------|--------------|
+| **Compiler** | MSVC (cl.exe) via Visual Studio 2022, x64 | g++ 7+ with C++17 support |
+| **Build System** | Direct cl.exe commands via batch | CMake 3.14+ and make |
+| **C++ Standard** | C++17 | C++17 |
+| **Dependencies** | None (header-only libs in `third_party/`) | pthread (auto-linked via CMake) |
+| **Optional** | - | OpenSSL (for HTTPS support) |
 
-> To port to Linux/macOS: remove `ws2_32.lib` from the build command; everything else compiles with `g++ -std=c++17`.
+**Installation:**
+
+| Platform | Command |
+|----------|---------|
+| **Windows** | Install Visual Studio 2022 with C++ Desktop Development |
+| **Ubuntu/Linux** | `sudo apt update && sudo apt install build-essential cmake` |
 
 ---
 
 ## Build
 
-```bat
-build.bat
-```
+| Platform | Command | Output Binaries |
+|----------|---------|-----------------|
+| **Windows** | `build.bat` | `build\mytool-cli.exe`<br>`build\mytool-server.exe` |
+| **Linux** | `./build.sh` | `build/cpp_cli`<br>`build/cpp_srv` |
 
-This will:
-1. Initialize the MSVC x64 environment (`vcvars64.bat`)
-2. Compile `build\mytool-cli.exe`
-3. Compile `build\mytool-server.exe`
-4. Copy `web\index.html` → `build\web\index.html`
+### What the build script does:
 
-If you see errors, run `build_debug.bat` instead — it prints full compiler output.
+1. **Windows (`build.bat`):**
+   - Initializes MSVC x64 environment (`vcvars64.bat`)
+   - Compiles both binaries with `cl.exe`
+   - Copies `web\index.html` → `build\web\index.html`
 
-> **Note:** `build.bat` has the vcvars path hardcoded:
+2. **Linux (`build.sh`):**
+   - Creates `build/` directory
+   - Runs CMake to generate Makefiles
+   - Compiles with `make -j4`
+   - Copies `web/` → `build/web/`
+
+### Debug build:
+
+| Platform | Command |
+|----------|---------|
+| **Windows** | `build_debug.bat` (prints full compiler output) |
+| **Linux** | `mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Debug .. && make` |
+
+### Clean rebuild:
+
+| Platform | Command |
+|----------|---------|
+| **Windows** | `rmdir /s /q build && build.bat` |
+| **Linux** | `rm -rf build && ./build.sh` |
+
+> **Note for Windows users:** `build.bat` has the vcvars path hardcoded:
 > `D:\jd\pro\vs2022\Packages\Community\VC\Auxiliary\Build\vcvars64.bat`
 > Update it if your VS is installed elsewhere.
 
@@ -71,20 +96,31 @@ If you see errors, run `build_debug.bat` instead — it prints full compiler out
 
 ## CLI Usage
 
-```bat
-:: List all available commands and their parameters
-build\mytool-cli.exe --schema
+### Basic commands:
 
-:: Run a command (output: JSON, agent-friendly)
+| Platform | Command | Description |
+|----------|---------|-------------|
+| **Windows** | `build\mytool-cli.exe --schema` | List all commands |
+| **Linux** | `./build/cpp_cli --schema` | List all commands |
+| **Windows** | `build\mytool-cli.exe --cmd echo --args "{\"text\":\"hello\"}"` | Run command |
+| **Linux** | `./build/cpp_cli --cmd echo --args '{"text":"hello"}'` | Run command |
+
+### Complete usage examples:
+
+```bash
+# Windows (PowerShell / CMD)
+build\mytool-cli.exe --schema
 build\mytool-cli.exe --cmd echo  --args "{\"text\":\"hello\"}"
 build\mytool-cli.exe --cmd add   --args "{\"a\":3,\"b\":4}"
 build\mytool-cli.exe --cmd upper --args "{\"text\":\"hello\"}"
-
-:: Human-readable output
 build\mytool-cli.exe --cmd add --args "{\"a\":3,\"b\":4}" --human
 
-:: Error case (non-zero exit code)
-build\mytool-cli.exe --cmd unknown --args "{}"
+# Linux (Bash)
+./build/cpp_cli --schema
+./build/cpp_cli --cmd echo --args '{"text":"hello"}'
+./build/cpp_cli --cmd add --args '{"a":3,"b":4}'
+./build/cpp_cli --cmd upper --args '{"text":"hello"}'
+./build/cpp_cli --cmd add --args '{"a":3,"b":4}' --human
 ```
 
 ### Output format
@@ -106,21 +142,29 @@ Exit code is `0` on success, `1` on any error — pipeline-safe.
 
 ## Server Usage
 
-```bat
-:: Start on default port 8080, dual-stack IPv4 + IPv6 (threads = CPU core count)
-build\mytool-server.exe
+### Starting the server:
 
-:: Custom port and thread count
-build\mytool-server.exe --port 9090 --threads 8
+| Platform | Command | Description |
+|----------|---------|-------------|
+| **Windows** | `build\mytool-server.exe` | Start on default port 8080 |
+| **Linux** | `./build/cpp_srv` | Start on default port 8080 |
+| **Windows** | `build\mytool-server.exe --port 9090` | Custom port |
+| **Linux** | `./build/cpp_srv --port 9090` | Custom port |
+| **Windows** | `build\mytool-server.exe --threads 8` | Custom thread count |
+| **Linux** | `./build/cpp_srv --threads 8` | Custom thread count |
+| **Windows** | `build\mytool-server.exe --no-ipv6` | IPv4 only |
+| **Linux** | `./build/cpp_srv --no-ipv6` | IPv4 only |
+| **Windows** | `build\mytool-server.exe --log server.log` | Enable file logging |
+| **Linux** | `./build/cpp_srv --log server.log` | Enable file logging |
 
-:: IPv4 only (skip IPv6 bind)
-build\mytool-server.exe --no-ipv6
+### Combined options example:
 
-:: Enable logging to file (console output remains)
-build\mytool-server.exe --log server.log
-
-:: Combine options
+```bash
+# Windows
 build\mytool-server.exe --port 8080 --threads 8 --log server.log
+
+# Linux
+./build/cpp_srv --port 8080 --threads 8 --log server.log
 ```
 
 On startup the server prints:
@@ -169,18 +213,7 @@ Each log entry includes:
 - IPv6 uses `IPV6_V6ONLY=true` so it does not overlap with IPv4
 - If the OS has no IPv6 support, a `[WARN]` is printed and the server falls back to IPv4 only
 
-The server must be run from the `build\` directory (it reads `web\index.html` relative to CWD).
-
-### REST API
-
-Route convention: **GET routes** use `/get/xxx`, **POST routes** use `/post/xxx`.
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/get/schema` | All registered commands with param definitions |
-| `GET`  | `/get/status` | Health check — threads, active requests |
-| `POST` | `/post/run`   | Execute a command |
-| `GET`  | `/`           | Browser GUI |
+The server must be run from the `build/` directory (it reads `web/index.html` relative to CWD).
 
 #### GET /get/schema
 
@@ -234,6 +267,73 @@ Returns the full command list with argument definitions.
 ### Browser GUI
 
 Open `http://localhost:8080` — it reads `/get/schema` on load and auto-builds the command list. Click any command to pre-fill its argument template, then hit **Run**.
+
+---
+
+## Running Tests
+
+| Test Type | Windows | Linux | Description |
+|-----------|---------|-------|-------------|
+| **CLI tests** | `test_cli.bat` | `./test_cli.sh` | CLI smoke tests (no server needed) |
+| **API tests** | Start server, then `test_server.bat` | Start server, then `./test_server.sh` | REST API tests |
+| **Concurrency** | `test_concurrent.bat` | `./test_comprehensive.sh` | Concurrency & timeout tests |
+| **IPv6 tests** | `test_ipv6.bat` | (included in test_server.sh) | Dual-stack IPv4/IPv6 tests |
+| **Logging tests** | - | `./test_logging.sh` | Server logging verification |
+
+### Running API tests (step by step):
+
+```bash
+# Windows - Terminal 1
+build\mytool-server.exe
+
+# Windows - Terminal 2
+test_server.bat
+
+# Linux - Terminal 1
+./build/cpp_srv
+
+# Linux - Terminal 2
+./test_server.sh
+```
+
+**Note:** 
+- Linux `test_server.sh` auto-detects the server port from the running process
+- Windows `test_ipv6.bat` uses `curl --noproxy "*"` to bypass system HTTP proxy for localhost IPv6 connections
+
+---
+
+## REST API Examples
+
+### Using curl:
+
+| Operation | Command |
+|-----------|---------|
+| **Get schema** | `curl http://localhost:8080/get/schema` |
+| **Get status** | `curl http://localhost:8080/get/status` |
+| **Run command** | `curl -X POST http://localhost:8080/post/run -H "Content-Type: application/json" -d '{"cmd":"echo","args":{"text":"hello"}}'` |
+
+### Complete examples:
+
+```bash
+# Get command schema
+curl http://localhost:8080/get/schema
+
+# Get server status
+curl http://localhost:8080/get/status
+
+# Execute commands
+curl -X POST http://localhost:8080/post/run \
+  -H "Content-Type: application/json" \
+  -d '{"cmd":"echo","args":{"text":"hello"}}'
+
+curl -X POST http://localhost:8080/post/run \
+  -H "Content-Type: application/json" \
+  -d '{"cmd":"add","args":{"a":10,"b":32}}'
+
+curl -X POST http://localhost:8080/post/run \
+  -H "Content-Type: application/json" \
+  -d '{"cmd":"add","args":{"a":10,"b":32},"timeout_ms":5000}'
+```
 
 ---
 
@@ -318,9 +418,11 @@ POST /post/run
 ```
 
 Then rebuild:
-```bat
-build.bat
-```
+
+| Platform | Command |
+|----------|---------|
+| **Windows** | `build.bat` |
+| **Linux** | `./build.sh` |
 
 The new command is immediately available in **both** CLI and Web GUI.
 
@@ -337,25 +439,18 @@ struct ArgDef {
 
 ---
 
-## Running Tests
+## Platform Differences
 
-```bat
-:: CLI tests (no server needed)
-test_cli.bat
-
-:: API tests (start server first)
-build\mytool-server.exe
-test_server.bat
-
-:: Concurrency + timeout tests
-test_concurrent.bat
-
-:: IPv4 + IPv6 dual-stack tests
-test_ipv6.bat
-```
-
-> **Note:** `test_ipv6.bat` uses `curl --noproxy "*"` to bypass any system HTTP proxy,
-> which would otherwise intercept `::1` (localhost IPv6) connections.
+| Aspect | Windows | Linux |
+|--------|---------|-------|
+| **Binary names** | `mytool-cli.exe`, `mytool-server.exe` | `cpp_cli`, `cpp_srv` |
+| **Compiler** | MSVC (cl.exe) | g++ |
+| **Build system** | Direct cl.exe via batch | CMake + make |
+| **Compiler flags** | `/std:c++17 /EHsc /O2` | `-std=c++17 -O2 -Wall -Wextra` |
+| **System libraries** | ws2_32.lib (Winsock) | pthread (auto-linked) |
+| **Scripts** | `.bat` files | `.sh` files |
+| **Shell quoting** | JSON args need escaped quotes `\"` | Use single quotes for JSON |
+| **Path separator** | Backslash `\` | Forward slash `/` |
 
 ---
 
@@ -376,12 +471,27 @@ test_ipv6.bat
 - **Persistent state.** The engine is stateless per-call. Add a shared state object if commands need to share data.
 - **Command namespacing.** All commands live in a flat map. For large projects, add a `group` field to `CmdDef`.
 - **OpenSSL / HTTPS.** httplib supports it via `#define CPPHTTPLIB_OPENSSL_SUPPORT` + linking OpenSSL. Not enabled here to keep the build simple.
-- **Linux/macOS build script.** Only `build.bat` (MSVC) exists. A `Makefile` or `CMakeLists.txt` would be straightforward to add.
 
 ### Known Build Quirks
 - **No Chinese / non-ASCII in source files** (except `web/index.html`). MSVC with codepage 936 will error on multibyte characters in `.cpp`/`.h` files. Keep all C++ comments in ASCII.
 - **Do NOT `#define CPPHTTPLIB_OPENSSL_SUPPORT 0`** — httplib uses `#ifdef`, so defining it to `0` still enables OpenSSL. Simply don't define it.
-- **Server must run from `build\`** — it reads `web\index.html` with a relative path. If you move the exe, fix the path in `server/main.cpp`.
+- **Server must run from `build/`** — it reads `web/index.html` with a relative path. If you move the exe, fix the path in `server/main.cpp`.
+- **Windows vcvars path** — `build.bat` has the vcvars64.bat path hardcoded. Update if your Visual Studio is installed elsewhere.
+
+---
+
+## Troubleshooting
+
+| Issue | Platform | Solution |
+|-------|----------|----------|
+| **Missing compiler** | Windows | Install Visual Studio 2022 with C++ Desktop Development |
+| **Missing compiler** | Linux | `sudo apt install build-essential cmake` |
+| **pthread errors** | Linux | `sudo apt install libpthread-stubs0-dev` |
+| **Port already in use** | Both | Use `--port <other_port>` when starting server |
+| **IPv6 warnings** | Both | Use `--no-ipv6` flag or ignore (falls back to IPv4) |
+| **Build errors** | Windows | Try `build_debug.bat` for verbose output |
+| **Build errors** | Linux | Check CMake version: `cmake --version` (need 3.14+) |
+| **Server can't find web/index.html** | Both | Run server from `build/` directory |
 
 ---
 
