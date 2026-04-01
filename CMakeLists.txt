@@ -11,9 +11,36 @@ endif()
 
 add_compile_options(-Wall -Wextra -O2)
 
+# ── Static linking option ──────────────────────────────────────────────────────
+option(STATIC_BUILD "Build with static linking for portability" OFF)
+
+if(STATIC_BUILD)
+    message(STATUS "Static build enabled - binaries will be portable")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++")
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+    set(BUILD_SHARED_LIBS OFF)
+endif()
+
 # ── httplib needs these on Linux ───────────────────────────────────────────────
 find_package(Threads REQUIRED)
 find_package(OpenSSL QUIET)
+
+# Enable OpenSSL support if available
+if(OpenSSL_FOUND)
+    message(STATUS "OpenSSL found - HTTPS support enabled")
+    add_compile_definitions(CPPHTTPLIB_OPENSSL_SUPPORT)
+else()
+    message(WARNING "OpenSSL not found - HTTPS support disabled")
+    message(WARNING "")
+    message(WARNING "To enable HTTPS support, install OpenSSL development libraries:")
+    message(WARNING "  Ubuntu/Debian: sudo apt update && sudo apt install libssl-dev")
+    message(WARNING "  CentOS/RHEL:   sudo yum install openssl-devel")
+    message(WARNING "  Fedora:        sudo dnf install openssl-devel")
+    message(WARNING "  Arch Linux:    sudo pacman -S openssl")
+    message(WARNING "")
+    message(WARNING "After installing, re-run: rm -rf build && ./build.sh")
+    message(WARNING "")
+endif()
 
 # ── Include paths ──────────────────────────────────────────────────────────────
 include_directories(
@@ -23,7 +50,20 @@ include_directories(
 
 # ── Server binary ──────────────────────────────────────────────────────────────
 add_executable(cpp_srv server/main.cpp)
-target_link_libraries(cpp_srv PRIVATE Threads::Threads)
+
+if(STATIC_BUILD)
+    # For static build, link pthread statically and prefer static libraries
+    target_link_libraries(cpp_srv PRIVATE -pthread)
+    if(OpenSSL_FOUND)
+        # Try to link OpenSSL statically
+        target_link_libraries(cpp_srv PRIVATE OpenSSL::SSL OpenSSL::Crypto -ldl)
+    endif()
+else()
+    target_link_libraries(cpp_srv PRIVATE Threads::Threads)
+    if(OpenSSL_FOUND)
+        target_link_libraries(cpp_srv PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+    endif()
+endif()
 
 # Copy web assets next to the binary so relative path works
 add_custom_command(TARGET cpp_srv POST_BUILD
@@ -35,7 +75,12 @@ add_custom_command(TARGET cpp_srv POST_BUILD
 
 # ── CLI binary ─────────────────────────────────────────────────────────────────
 add_executable(cpp_cli cli/main.cpp)
-target_link_libraries(cpp_cli PRIVATE Threads::Threads)
+
+if(STATIC_BUILD)
+    target_link_libraries(cpp_cli PRIVATE -pthread)
+else()
+    target_link_libraries(cpp_cli PRIVATE Threads::Threads)
+endif()
 
 # ── Install (optional) ─────────────────────────────────────────────────────────
 install(TARGETS cpp_srv cpp_cli DESTINATION bin)

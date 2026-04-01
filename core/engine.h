@@ -44,7 +44,27 @@ struct Result
 
     json to_json() const
     {
-        return { {"code", code}, {"output", output}, {"error", error} };
+        json result;
+        result["code"] = code;
+        
+        // Try to parse output as JSON; if successful, embed as object
+        // This makes read_json and similar commands return clean JSON objects
+        if (!output.empty() && (output[0] == '{' || output[0] == '['))
+        {
+            try {
+                result["output"] = json::parse(output);
+            } catch (...) {
+                // If parse fails, keep as string
+                result["output"] = output;
+            }
+        }
+        else
+        {
+            result["output"] = output;
+        }
+        
+        result["error"] = error;
+        return result;
     }
 };
 

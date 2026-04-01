@@ -47,10 +47,20 @@ cpp_cli_srv/
 
 **Installation:**
 
-| Platform | Command |
-|----------|---------|
-| **Windows** | Install Visual Studio 2022 with C++ Desktop Development |
-| **Ubuntu/Linux** | `sudo apt update && sudo apt install build-essential cmake` |
+| Platform | Command | HTTPS Support |
+|----------|---------|---------------|
+| **Windows** | Install Visual Studio 2022 with C++ Desktop Development | ❌ Not yet supported |
+| **Ubuntu/Debian** | `sudo apt update && sudo apt install build-essential cmake` | ❌ No |
+| **Ubuntu/Debian (HTTPS)** | `sudo apt update && sudo apt install build-essential cmake libssl-dev` | ✅ Yes |
+| **CentOS/RHEL (HTTPS)** | `sudo yum install gcc-c++ cmake openssl-devel` | ✅ Yes |
+| **Fedora (HTTPS)** | `sudo dnf install gcc-c++ cmake openssl-devel` | ✅ Yes |
+| **Arch Linux (HTTPS)** | `sudo pacman -S base-devel cmake openssl` | ✅ Yes |
+
+**Notes**: 
+- OpenSSL development libraries (`libssl-dev` on Ubuntu/Debian) are **required for HTTPS support**
+- The build system automatically detects and enables HTTPS if OpenSSL is available
+- If OpenSSL is not found during build, you'll see installation instructions in the CMake output
+- HTTP-only mode works without OpenSSL (HTTPS features will be disabled)
 
 ---
 
@@ -59,7 +69,29 @@ cpp_cli_srv/
 | Platform | Command | Output Binaries |
 |----------|---------|-----------------|
 | **Windows** | `build.bat` | `build\cpp_cli.exe`<br>`build\cpp_srv.exe` |
+| **Windows (Static)** | `build.bat --static` | Portable binaries with static C++ runtime |
 | **Linux** | `./build.sh` | `build/cpp_cli`<br>`build/cpp_srv` |
+| **Linux (Static)** | `./build.sh --static` | Portable binaries with static C++ stdlib |
+
+### Static builds (Portable)
+
+For cloud deployment or running on different machines without installing dependencies:
+
+```bash
+# Linux - creates portable binaries
+./build.sh --static
+
+# Windows - includes C++ runtime (/MT flag)
+build.bat --static
+```
+
+**Benefits:**
+- ✅ Copy to any machine without dependency installation
+- ✅ No "library not found" errors
+- ✅ Perfect for cloud servers (AWS, GCP, Azure)
+- ✅ Works in minimal Docker containers
+
+See [BUILD_STATIC.md](BUILD_STATIC.md) for detailed static build guide.
 
 ### What the build script does:
 
@@ -100,6 +132,8 @@ cpp_cli_srv/
 
 | Platform | Command | Description |
 |----------|---------|-------------|
+| **Windows** | `build\cpp_cli.exe --help` | Show help message |
+| **Linux** | `./build/cpp_cli --help` | Show help message |
 | **Windows** | `build\cpp_cli.exe --schema` | List all commands |
 | **Linux** | `./build/cpp_cli --schema` | List all commands |
 | **Windows** | `build\cpp_cli.exe --cmd echo --args "{\"text\":\"hello\"}"` | Run command |
@@ -109,6 +143,7 @@ cpp_cli_srv/
 
 ```bash
 # Windows (PowerShell / CMD)
+build\cpp_cli.exe --help
 build\cpp_cli.exe --schema
 build\cpp_cli.exe --cmd echo  --args "{\"text\":\"hello\"}"
 build\cpp_cli.exe --cmd add   --args "{\"a\":3,\"b\":4}"
@@ -116,6 +151,7 @@ build\cpp_cli.exe --cmd upper --args "{\"text\":\"hello\"}"
 build\cpp_cli.exe --cmd add --args "{\"a\":3,\"b\":4}" --human
 
 # Linux (Bash)
+./build/cpp_cli --help
 ./build/cpp_cli --schema
 ./build/cpp_cli --cmd echo --args '{"text":"hello"}'
 ./build/cpp_cli --cmd add --args '{"a":3,"b":4}'
@@ -146,10 +182,14 @@ Exit code is `0` on success, `1` on any error — pipeline-safe.
 
 | Platform | Command | Description |
 |----------|---------|-------------|
-| **Windows** | `build\cpp_srv.exe` | Start on default port 8080 |
-| **Linux** | `./build/cpp_srv` | Start on default port 8080 |
-| **Windows** | `build\cpp_srv.exe --port 9090` | Custom port |
-| **Linux** | `./build/cpp_srv --port 9090` | Custom port |
+| **Windows** | `build\cpp_srv.exe --help` | Show help message |
+| **Linux** | `./build/cpp_srv --help` | Show help message |
+| **Windows** | `build\cpp_srv.exe` | Start on default port 8080 (HTTP only) |
+| **Linux** | `./build/cpp_srv` | Start on default port 8080 (HTTP only) |
+| **Windows** | `build\cpp_srv.exe --port 9090` | Custom HTTP port |
+| **Linux** | `./build/cpp_srv --port 9090` | Custom HTTP port |
+| **Windows** | `build\cpp_srv.exe --port_https 8443 --ssl C:\path\to\ssl` | Enable HTTPS on port 8443 |
+| **Linux** | `./build/cpp_srv --port_https 8443 --ssl /path/to/ssl` | Enable HTTPS on port 8443 |
 | **Windows** | `build\cpp_srv.exe --threads 8` | Custom thread count |
 | **Linux** | `./build/cpp_srv --threads 8` | Custom thread count |
 | **Windows** | `build\cpp_srv.exe --no-ipv6` | IPv4 only |
@@ -161,28 +201,57 @@ Exit code is `0` on success, `1` on any error — pipeline-safe.
 
 > **Security Note:** The `--token` parameter enables authentication for the `call_shell` command. Token must be at least 2 characters and contain only alphanumeric characters and underscores. If no token is provided, `call_shell` will be disabled via the web interface.
 
+> **HTTPS Note:** To enable HTTPS, you need:
+> - OpenSSL development libraries installed (`libssl-dev` on Ubuntu)
+> - SSL certificate files: `server.crt` and `server.key` in the directory specified by `--ssl`
+> - Both `--port_https` and `--ssl` parameters must be provided together
+
 ### Combined options example:
 
 ```bash
-# Windows
+# Windows - HTTP only
 build\cpp_srv.exe --port 8080 --threads 8 --log server.log --token secure_token_123
 
-# Linux
+# Windows - HTTP + HTTPS
+build\cpp_srv.exe --port 8080 --port_https 8443 --ssl C:\path\to\ssl --log server.log
+
+# Linux - HTTP only
 ./build/cpp_srv --port 8080 --threads 8 --log server.log --token secure_token_123
+
+# Linux - HTTP + HTTPS
+./build/cpp_srv --port 8080 --port_https 8443 --ssl /root/jd/t/t0/cc1/create_httpd_img/ssl --log server.log
 ```
 
 On startup the server prints:
 
+**HTTP only:**
 ```
 === cpp_srv started ===
-  IPv4 : http://0.0.0.0:8080
-  IPv6 : http://[::]:8080
+  IPv4 (HTTP)  : http://0.0.0.0:8080
+  IPv6 (HTTP)  : http://[::]:8080
   Threads : 20 per server
   Schema  : GET  /get/schema
   Status  : GET  /get/status
   Run     : POST /post/run
   GUI     : GET  /
   Log     : server.log
+  Press Ctrl+C to stop.
+```
+
+**HTTP + HTTPS:**
+```
+=== cpp_srv started ===
+  IPv4 (HTTP)  : http://0.0.0.0:8080
+  IPv6 (HTTP)  : http://[::]:8080
+  IPv4 (HTTPS) : https://0.0.0.0:8443
+  IPv6 (HTTPS) : https://[::]:8443
+  Threads : 20 per server
+  Schema  : GET  /get/schema
+  Status  : GET  /get/status
+  Run     : POST /post/run
+  GUI     : GET  /
+  Log     : server.log
+  SSL     : /root/jd/t/t0/cc1/create_httpd_img/ssl
   Press Ctrl+C to stop.
 ```
 
@@ -282,6 +351,7 @@ Open `http://localhost:8080` — it reads `/get/schema` on load and auto-builds 
 | **API tests** | Start server, then `test_server.bat` | Start server, then `./test_server.sh` | REST API tests |
 | **Shell tests** | `test_shell.bat` | `./test_shell.sh` | Test call_shell command |
 | **Token tests** | `test_token.bat` | `./test_token.sh` | Token authentication tests |
+| **JSON tests** | `test_json.bat` | `./test_json.sh` | JSON file I/O tests |
 | **Concurrency** | `test_concurrent.bat` | `./test_comprehensive.sh` | Concurrency & timeout tests |
 | **IPv6 tests** | `test_ipv6.bat` | (included in test_server.sh) | Dual-stack IPv4/IPv6 tests |
 | **Logging tests** | - | `./test_logging.sh` | Server logging verification |
@@ -458,6 +528,8 @@ The framework includes several built-in commands to demonstrate different patter
 | `upper` | Sync | Convert to uppercase | `{"cmd":"upper","args":{"text":"hello"}}` |
 | `slow_task` | Async | Simulate slow operation | `{"cmd":"slow_task","args":{"ms":2000}}` |
 | `call_shell` | Async | Execute shell command | `{"cmd":"call_shell","args":{"command":"cat /etc/*release"}}` |
+| `write_json` | Sync | Write JSON to file | `{"cmd":"write_json","args":{"path":"./data/test.json","json_content":{"k":"v"}}}` |
+| `read_json` | Sync | Read JSON from file | `{"cmd":"read_json","args":{"path":"./data/test.json"}}` |
 
 ### call_shell Command
 
@@ -519,6 +591,58 @@ The `call_shell` command executes arbitrary shell commands. In production enviro
 |----------|-------------|
 | **Windows** | `test_shell.bat` |
 | **Linux** | `./test_shell.sh` |
+
+### write_json and read_json Commands
+
+The `write_json` and `read_json` commands provide JSON file I/O operations:
+
+**write_json - Write JSON to file:**
+- **Arguments:**
+  - `path` (required): File path to write (e.g., `./data/config.json`)
+  - `json_content` (required): JSON object to write to file
+- **Returns:**
+  - Success: `{"code":0,"output":"File written: <path>","error":""}`
+  - Failure: `{"code":1,"error":"failed to open file for writing: <path>","output":""}`
+- **Features:**
+  - Pretty-printed JSON (2-space indentation)
+  - Creates nested directories if parent path exists
+  - Overwrites existing files
+
+**read_json - Read JSON from file:**
+- **Arguments:**
+  - `path` (required): File path to read (e.g., `./data/config.json`)
+- **Returns:**
+  - Success: `{"code":0,"output":"<json content as string>","error":""}`
+  - File error: `{"code":1,"error":"failed to open file for reading: <path>","output":""}`
+  - Parse error: `{"code":4,"error":"JSON parse error: <details>","output":""}`
+
+**Examples:**
+
+```bash
+# Windows CLI
+build\cpp_cli.exe --cmd write_json --args "{\"path\":\"./data/config.json\",\"json_content\":{\"host\":\"localhost\",\"port\":8080}}" --human
+build\cpp_cli.exe --cmd read_json --args "{\"path\":\"./data/config.json\"}" --human
+
+# Linux CLI
+./build/cpp_cli --cmd write_json --args '{"path":"./data/config.json","json_content":{"host":"localhost","port":8080}}' --human
+./build/cpp_cli --cmd read_json --args '{"path":"./data/config.json"}' --human
+
+# Via HTTP API
+curl -X POST http://localhost:8080/post/run \
+  -H "Content-Type: application/json" \
+  -d '{"cmd":"write_json","args":{"path":"./data/test.json","json_content":{"user":"alice","score":100}}}'
+
+curl -X POST http://localhost:8080/post/run \
+  -H "Content-Type: application/json" \
+  -d '{"cmd":"read_json","args":{"path":"./data/test.json"}}'
+```
+
+**Testing:**
+
+| Platform | Test Script |
+|----------|-------------|
+| **Windows** | `test_json.bat` |
+| **Linux** | `./test_json.sh` |
 
 ---
 

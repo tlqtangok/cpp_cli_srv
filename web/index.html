@@ -31,6 +31,18 @@
     padding: 14px; font-family: 'Consolas', monospace; font-size: .85rem; white-space: pre-wrap;
     overflow: auto; color: #68d391; min-height: 180px; }
   .result-box.err { color: #fc8181; }
+  .curl-box { background: #1a202c; border: 1px solid #2d3748; border-radius: 8px;
+    padding: 12px 14px; font-family: 'Consolas', monospace; font-size: .8rem; 
+    overflow-x: auto; color: #a0aec0; white-space: pre-wrap; word-break: break-all; }
+  .curl-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .copy-btn { padding: 4px 12px; background: #2d3748; border: none; border-radius: 4px;
+    color: #a0aec0; font-size: .75rem; cursor: pointer; transition: background .15s; }
+  .copy-btn:hover { background: #4a5568; color: #e2e8f0; }
+  .os-toggle { display: flex; gap: 4px; }
+  .os-btn { padding: 4px 12px; background: #1a202c; border: 1px solid #2d3748; border-radius: 4px;
+    color: #a0aec0; font-size: .75rem; cursor: pointer; transition: all .15s; }
+  .os-btn.active { background: #2b6cb0; border-color: #63b3ed; color: #fff; }
+  .os-btn:hover:not(.active) { background: #2d3748; }
   .tag { font-size: .7rem; padding: 2px 7px; border-radius: 10px; background: #2d3748; color: #a0aec0; }
 </style>
 </head>
@@ -48,11 +60,24 @@
   <div class="main">
     <div>
       <label>Command</label>
-      <input type="text" id="cmdInput" placeholder="e.g. echo" />
+      <input type="text" id="cmdInput" placeholder="e.g. echo" oninput="updateCurl()" />
     </div>
     <div>
       <label>Args (JSON)</label>
-      <textarea id="argsInput" rows="4" placeholder='{"text": "hello"}'></textarea>
+      <textarea id="argsInput" rows="8" placeholder='{"text": "hello"}' oninput="updateCurl()"></textarea>
+    </div>
+    <div>
+      <div class="curl-label">
+        <label>Equivalent curl command</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div class="os-toggle">
+            <button class="os-btn active" id="linuxBtn" onclick="switchOS('linux')">🐧 Linux</button>
+            <button class="os-btn" id="windowsBtn" onclick="switchOS('windows')">🪟 Windows</button>
+          </div>
+          <button class="copy-btn" onclick="copyCurl()">📋 Copy</button>
+        </div>
+      </div>
+      <div class="curl-box" id="curlBox">—</div>
     </div>
     <div class="row">
       <button id="runBtn" onclick="runCmd()">▶ Run</button>
@@ -67,6 +92,9 @@ const API = '';   // 同源，无需前缀
 
 // Token storage for call_shell command
 let shellToken = sessionStorage.getItem('shell_token') || '';
+
+// Curl OS preference (default: linux)
+let curlOS = localStorage.getItem('curl_os') || 'linux';
 
 async function loadSchema() {
   try {
@@ -98,6 +126,133 @@ function fillCmd(c) {
   });
   document.getElementById('argsInput').value = JSON.stringify(sample, null, 2);
   document.querySelectorAll('.cmd-btn').forEach(b => b.classList.toggle('active', b.textContent === c.name));
+  updateCurl();
+}
+
+function switchOS(os) {
+  curlOS = os;
+  localStorage.setItem('curl_os', os);
+  
+  // Update button states
+  document.getElementById('linuxBtn').classList.toggle('active', os === 'linux');
+  document.getElementById('windowsBtn').classList.toggle('active', os === 'windows');
+  
+  // Regenerate curl command
+  updateCurl();
+}
+
+function updateCurl() {
+  const cmd = document.getElementById('cmdInput').value.trim();
+  const args = document.getElementById('argsInput').value.trim();
+  const curlBox = document.getElementById('curlBox');
+  
+  if (!cmd) {
+    curlBox.textContent = '—';
+    return;
+  }
+  
+  // Get base URL (window.location.origin gives the current host)
+  const baseUrl = window.location.origin;
+  
+  // Determine if HTTPS and add -k flag if needed
+  const isHttps = baseUrl.startsWith('https://');
+  const curlFlags = isHttps ? '-k ' : '';
+  
+  // Build the JSON body
+  let jsonBody = { cmd };
+  if (args) {
+    try {
+      const argsObj = JSON.parse(args);
+      jsonBody.args = argsObj;
+    } catch(e) {
+      // Invalid JSON, show it anyway for debugging
+      jsonBody.args = {};
+    }
+  } else {
+    jsonBody.args = {};
+  }
+  
+  // Generate curl command based on OS
+  let curlCmd;
+  if (curlOS === 'windows') {
+    // Windows: use double quotes and escape them
+    const jsonStr = JSON.stringify(jsonBody).replace(/"/g, '\\"');
+    curlCmd = `curl ${curlFlags}-X POST ${baseUrl}/post/run -H "Content-Type: application/json" -d "${jsonStr}"`;
+  } else {
+    // Linux: use single quotes for both header and data - no escaping needed!
+    const jsonStr = JSON.stringify(jsonBody);
+    curlCmd = `curl ${curlFlags}-X POST ${baseUrl}/post/run -H 'Content-Type: application/json' -d '${jsonStr}'`;
+  }
+  
+  curlBox.textContent = curlCmd;
+}
+
+function copyCurl() {
+  const curlBox = document.getElementById('curlBox');
+  const text = curlBox.textContent;
+  const btn = event.target;
+  const originalText = btn.textContent;
+  
+  if (text === '—') {
+    // Show feedback for empty command
+    btn.textContent = '⚠ Empty';
+    btn.style.background = '#744210';
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.style.background = '';
+    }, 2000);
+    return;
+  }
+  
+  // Try modern clipboard API first
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '✓ Copied';
+      btn.style.background = '#276749';
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.background = '';
+      }, 2000);
+    }).catch(err => {
+      // If clipboard API fails, use fallback
+      fallbackCopy(text, btn, originalText);
+    });
+  } else {
+    // Use fallback for older browsers
+    fallbackCopy(text, btn, originalText);
+  }
+}
+
+function fallbackCopy(text, btn, originalText) {
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const success = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    
+    if (success) {
+      btn.textContent = '✓ Copied';
+      btn.style.background = '#276749';
+    } else {
+      btn.textContent = '✗ Failed';
+      btn.style.background = '#742a2a';
+    }
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.style.background = '';
+    }, 2000);
+  } catch (err) {
+    btn.textContent = '✗ Error';
+    btn.style.background = '#742a2a';
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.style.background = '';
+    }, 2000);
+  }
 }
 
 async function runCmd() {
@@ -154,6 +309,12 @@ async function runCmd() {
 
 document.addEventListener('keydown', e => {
   if (e.ctrlKey && e.key === 'Enter') runCmd();
+});
+
+// Initialize OS button states on load
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('linuxBtn').classList.toggle('active', curlOS === 'linux');
+  document.getElementById('windowsBtn').classList.toggle('active', curlOS === 'windows');
 });
 
 loadSchema();

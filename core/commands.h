@@ -7,6 +7,7 @@
 #include <memory>
 #include <array>
 #include <sstream>
+#include <fstream>  // For file I/O operations
 
 // Register all commands here.
 // Both CLI and Web Server call register_all() - zero duplication.
@@ -184,6 +185,112 @@ inline void register_all(Engine& e)
                     return { 3, "", std::string("exception: ") + e.what() };
                 }
             });
+        }
+    );
+
+    // -------------------------------------------------------------------------
+    // write_json - Write JSON content to file
+    //
+    // Writes a JSON object to a file with pretty formatting.
+    //
+    // Arguments:
+    //   - path: File path to write to (required)
+    //   - json_content: JSON object to write (required)
+    //
+    // Returns:
+    //   - Success: {"code":0, "output":"File written: <path>", "error":""}
+    //   - Error: {"code":1, "output":"", "error":"error message"}
+    //
+    // Examples:
+    //   {"cmd":"write_json","args":{"path":"./data/test.json","json_content":{"k0":"v0","k1":"v1"}}}
+    // -------------------------------------------------------------------------
+    e.reg(
+        { "write_json", "Write JSON content to a file",
+          { {"path", "file path to write", true, std::string("./data/test.json")},
+            {"json_content", "JSON object to write", true, json::object({{"k1","v1"},{"k2","v2"},{"k3",33}})} } },
+        [](const json& args) -> Result
+        {
+            std::string path = args.value("path", "");
+            
+            if (path.empty()) {
+                return { 1, "", "path is required" };
+            }
+            
+            if (!args.contains("json_content")) {
+                return { 1, "", "json_content is required" };
+            }
+            
+            try {
+                json content = args["json_content"];
+                
+                // Open file for writing
+                std::ofstream file(path);
+                if (!file.is_open()) {
+                    return { 1, "", "failed to open file for writing: " + path };
+                }
+                
+                // Write JSON with pretty formatting (indent = 2 spaces)
+                file << content.dump(2) << std::endl;
+                file.close();
+                
+                return { 0, "File written: " + path, "" };
+                
+            } catch (const json::exception& e) {
+                return { 4, "", std::string("JSON error: ") + e.what() };
+            } catch (const std::exception& e) {
+                return { 3, "", std::string("exception: ") + e.what() };
+            }
+        }
+    );
+
+    // -------------------------------------------------------------------------
+    // read_json - Read JSON content from file
+    //
+    // Reads a JSON file and returns its content as a JSON object.
+    //
+    // Arguments:
+    //   - path: File path to read from (required)
+    //
+    // Returns:
+    //   - Success: {"code":0, "output":{...json object...}, "error":""}
+    //   - Error: {"code":1, "output":"", "error":"error message"}
+    //
+    // Note: The output field is automatically parsed as JSON object, not a string.
+    //
+    // Examples:
+    //   {"cmd":"read_json","args":{"path":"./data/test.json"}}
+    // -------------------------------------------------------------------------
+    e.reg(
+        { "read_json", "Read JSON content from a file",
+          { {"path", "file path to read", true, std::string("./data/test.json")} } },
+        [](const json& args) -> Result
+        {
+            std::string path = args.value("path", "");
+            
+            if (path.empty()) {
+                return { 1, "", "path is required" };
+            }
+            
+            try {
+                // Open file for reading
+                std::ifstream file(path);
+                if (!file.is_open()) {
+                    return { 1, "", "failed to open file for reading: " + path };
+                }
+                
+                // Parse JSON from file
+                json content;
+                file >> content;
+                file.close();
+                
+                // Return the JSON content as compact string (will be auto-parsed to object in output)
+                return { 0, content.dump(), "" };
+                
+            } catch (const json::exception& e) {
+                return { 4, "", std::string("JSON parse error: ") + e.what() };
+            } catch (const std::exception& e) {
+                return { 3, "", std::string("exception: ") + e.what() };
+            }
         }
     );
 

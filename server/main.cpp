@@ -273,20 +273,50 @@ static httplib::Server* make_server(size_t threads)
 // ---------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {
-    int         port    = DEFAULT_PORT;
-    size_t      threads = THREAD_POOL_SIZE;
-    bool        no_ipv6 = false;
-    std::string logfile = "";
-    std::string token   = "";
+    int         port        = DEFAULT_PORT;
+    int         port_https  = 0;              // 0 = HTTPS disabled
+    size_t      threads     = THREAD_POOL_SIZE;
+    bool        no_ipv6     = false;
+    std::string logfile     = "";
+    std::string token       = "";
+    std::string ssl_dir     = "";             // SSL certificate directory
 
     for (int i = 1; i < argc; ++i)
     {
         std::string flag = argv[i];
-        if      (flag == "--port"    && i+1 < argc) port    = std::stoi(argv[++i]);
-        else if (flag == "--threads" && i+1 < argc) threads = (size_t)std::stoi(argv[++i]);
-        else if (flag == "--no-ipv6")               no_ipv6 = true;
-        else if (flag == "--log"     && i+1 < argc) logfile = argv[++i];
-        else if (flag == "--token"   && i+1 < argc) token   = argv[++i];
+        if      (flag == "--port"       && i+1 < argc) port       = std::stoi(argv[++i]);
+        else if (flag == "--port_https" && i+1 < argc) port_https = std::stoi(argv[++i]);
+        else if (flag == "--threads"    && i+1 < argc) threads    = (size_t)std::stoi(argv[++i]);
+        else if (flag == "--no-ipv6")                  no_ipv6    = true;
+        else if (flag == "--log"        && i+1 < argc) logfile    = argv[++i];
+        else if (flag == "--token"      && i+1 < argc) token      = argv[++i];
+        else if (flag == "--ssl"        && i+1 < argc) ssl_dir    = argv[++i];
+        else if (flag == "-h" || flag == "--help")
+        {
+            std::cout << "cpp_srv - C++ CLI/HTTP Server\n\n"
+                      << "Usage: cpp_srv [options]\n\n"
+                      << "Options:\n"
+                      << "  --port <number>       HTTP server port (default: 8080)\n"
+                      << "  --port_https <number> HTTPS server port (requires --ssl, default: disabled)\n"
+                      << "  --ssl <directory>     SSL certificate directory (must contain server.crt and server.key)\n"
+                      << "  --threads <number>    Thread pool size (default: hardware_concurrency)\n"
+                      << "  --no-ipv6             Disable IPv6 server (IPv4 only)\n"
+                      << "  --log <file>          Enable logging to file\n"
+                      << "  --token <string>      Security token for call_shell command (min 2 chars, alphanumeric + underscore)\n"
+                      << "  -h, --help            Show this help message\n\n"
+                      << "Examples:\n"
+                      << "  cpp_srv\n"
+                      << "  cpp_srv --port 8080 --port_https 8443 --ssl /path/to/ssl\n"
+                      << "  cpp_srv --port 9090 --threads 8\n"
+                      << "  cpp_srv --port 8080 --log server.log --token mytoken123\n"
+                      << "  cpp_srv --no-ipv6 --port 8080\n\n"
+                      << "Once started, access:\n"
+                      << "  Web GUI (HTTP):  http://localhost:8080/\n"
+                      << "  Web GUI (HTTPS): https://localhost:8443/\n"
+                      << "  Schema:  http://localhost:8080/get/schema\n"
+                      << "  Status:  http://localhost:8080/get/status\n";
+            return 0;
+        }
     }
 
     // Validate token if provided
@@ -294,6 +324,43 @@ int main(int argc, char* argv[])
     {
         std::cerr << "Error: token must be at least 2 characters and contain only letters, numbers, or underscore\n";
         return 1;
+    }
+
+    // Validate HTTPS configuration
+    if (port_https > 0 && ssl_dir.empty())
+    {
+        std::cerr << "Error: --port_https requires --ssl <directory>\n";
+        return 1;
+    }
+    
+    if (!ssl_dir.empty() && port_https == 0)
+    {
+        std::cerr << "Error: --ssl requires --port_https <port>\n";
+        return 1;
+    }
+
+    // Validate SSL files exist
+    if (port_https > 0)
+    {
+        std::string cert_file = ssl_dir + "/server.crt";
+        std::string key_file  = ssl_dir + "/server.key";
+        
+        std::ifstream cert(cert_file);
+        std::ifstream key(key_file);
+        
+        if (!cert.good())
+        {
+            std::cerr << "Error: SSL certificate not found: " << cert_file << "\n";
+            return 1;
+        }
+        if (!key.good())
+        {
+            std::cerr << "Error: SSL key not found: " << key_file << "\n";
+            return 1;
+        }
+        
+        cert.close();
+        key.close();
     }
 
     if (threads == 0)
@@ -353,16 +420,109 @@ int main(int argc, char* argv[])
         }
     }
 
-    // --- Wait until both are up, then print banner -------------------------
+    // --- HTTPS server (optional) --------------------------------------------
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+    httplib::SSLServer* svr_https4 = nullptr;
+    httplib::SSLServer* svr_https6 = nullptr;
+    std::thread         t_https4;
+    std::thread         t_https6;
+
+    if (port_https > 0)
+    {
+        std::string cert_file = ssl_dir + "/server.crt";
+        std::string key_file  = ssl_dir + "/server.key";
+        
+        logger.log("Starting HTTPS server on port " + std::to_string(port_https));
+        
+        // HTTPS IPv4
+        svr_https4 = new httplib::SSLServer(cert_file.c_str(), key_file.c_str());
+        svr_https4->new_task_queue = [threads]()
+        {
+            return new httplib::ThreadPool(threads, threads * 4);
+        };
+        svr_https4->set_read_timeout(5, 0);
+        svr_https4->set_write_timeout(5, 0);
+        svr_https4->set_payload_max_length(MAX_BODY_BYTES);
+        mount_routes(*svr_https4, e, active, threads, logger, token);
+        
+        if (!svr_https4->bind_to_port("0.0.0.0", port_https))
+        {
+            logger.log("ERROR: Cannot bind HTTPS IPv4 0.0.0.0:" + std::to_string(port_https));
+            std::cerr << "[ERROR] Cannot bind HTTPS IPv4 0.0.0.0:" << port_https << "\n";
+            delete svr_https4;
+            svr_https4 = nullptr;
+        }
+        else
+        {
+            logger.log("HTTPS IPv4 server bound to 0.0.0.0:" + std::to_string(port_https));
+            t_https4 = std::thread([svr_https4]()
+            {
+                svr_https4->listen_after_bind();
+            });
+        }
+        
+        // HTTPS IPv6 (if not disabled)
+        if (!no_ipv6 && svr_https4)
+        {
+            svr_https6 = new httplib::SSLServer(cert_file.c_str(), key_file.c_str());
+            svr_https6->new_task_queue = [threads]()
+            {
+                return new httplib::ThreadPool(threads, threads * 4);
+            };
+            svr_https6->set_read_timeout(5, 0);
+            svr_https6->set_write_timeout(5, 0);
+            svr_https6->set_payload_max_length(MAX_BODY_BYTES);
+            svr_https6->set_ipv6_v6only(true);
+            mount_routes(*svr_https6, e, active, threads, logger, token);
+            
+            if (!svr_https6->bind_to_port("::", port_https))
+            {
+                logger.log("WARN: Cannot bind HTTPS IPv6 [::]:" + std::to_string(port_https) + " - running IPv4 only");
+                std::cerr << "[WARN] Cannot bind HTTPS IPv6 [::]:" << port_https
+                          << " - running IPv4 only\n";
+                delete svr_https6;
+                svr_https6 = nullptr;
+            }
+            else
+            {
+                logger.log("HTTPS IPv6 server bound to [::]:" + std::to_string(port_https));
+                t_https6 = std::thread([svr_https6]()
+                {
+                    svr_https6->listen_after_bind();
+                });
+            }
+        }
+    }
+#else
+    if (port_https > 0)
+    {
+        std::cerr << "[ERROR] HTTPS requested but OpenSSL support not compiled in\n";
+        std::cerr << "        Rebuild with -DCPPHTTPLIB_OPENSSL_SUPPORT and link OpenSSL\n";
+        logger.log("ERROR: HTTPS requested but OpenSSL support not available");
+        return 1;
+    }
+#endif
+
+    // --- Wait until all servers are up, then print banner ------------------
     svr4->wait_until_ready();
     if (svr6) svr6->wait_until_ready();
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+    if (svr_https4) svr_https4->wait_until_ready();
+    if (svr_https6) svr_https6->wait_until_ready();
+#endif
 
     logger.log("Server ready - accepting connections");
     
     std::cout << "=== cpp_srv started ===\n"
-              << "  IPv4 : http://0.0.0.0:"     << port << "\n";
+              << "  IPv4 (HTTP)  : http://0.0.0.0:"     << port << "\n";
     if (svr6)
-        std::cout << "  IPv6 : http://[::]:" << port << "\n";
+        std::cout << "  IPv6 (HTTP)  : http://[::]:" << port << "\n";
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+    if (svr_https4)
+        std::cout << "  IPv4 (HTTPS) : https://0.0.0.0:" << port_https << "\n";
+    if (svr_https6)
+        std::cout << "  IPv6 (HTTPS) : https://[::]:" << port_https << "\n";
+#endif
     std::cout << "  Threads : " << threads << " per server\n"
               << "  Schema  : GET  /get/schema\n"
               << "  Status  : GET  /get/status\n"
@@ -370,14 +530,24 @@ int main(int argc, char* argv[])
               << "  GUI     : GET  /\n";
     if (!logfile.empty())
         std::cout << "  Log     : " << logfile << "\n";
+    if (port_https > 0)
+        std::cout << "  SSL     : " << ssl_dir << "\n";
     std::cout << "  Press Ctrl+C to stop.\n";
 
     // --- Block main thread until servers exit ------------------------------
     t4.join();
     if (t6.joinable()) t6.join();
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+    if (t_https4.joinable()) t_https4.join();
+    if (t_https6.joinable()) t_https6.join();
+#endif
 
     logger.log("Server shutting down");
     delete svr4;
-    delete svr6;
+    if (svr6) delete svr6;
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+    if (svr_https4) delete svr_https4;
+    if (svr_https6) delete svr_https6;
+#endif
     return 0;
 }
