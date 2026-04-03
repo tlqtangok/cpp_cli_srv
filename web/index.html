@@ -90,8 +90,22 @@
 <script>
 const API = '';   // 同源，无需前缀
 
+// Server token for authenticated commands
+let serverToken = '';
+
 // Curl OS preference (default: linux)
 let curlOS = localStorage.getItem('curl_os') || 'linux';
+
+// Fetch server token on load
+async function loadToken() {
+  try {
+    const r = await fetch(API + '/get/token');
+    const data = await r.json();
+    serverToken = data.token || '';
+  } catch(e) {
+    console.error('Failed to load token:', e);
+  }
+}
 
 async function loadSchema() {
   try {
@@ -263,8 +277,12 @@ async function runCmd() {
     catch { box.className = 'result-box err'; box.textContent = 'invalid JSON in args'; return; }
   }
 
-  // Server auto-injects token for authenticated commands
-  // No need for client-side token handling
+  // Inject token for authenticated commands
+  const authenticatedCommands = ['call_shell', 'get_global_json', 'set_global_json', 'patch_global_json'];
+  if (authenticatedCommands.includes(cmd)) {
+    args.token = serverToken;
+  }
+
   let body = { cmd, args };
 
   try {
@@ -295,6 +313,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('windowsBtn').classList.toggle('active', curlOS === 'windows');
 });
 
+// Load token and schema on page load
+loadToken();
 loadSchema();
 </script>
 </body>

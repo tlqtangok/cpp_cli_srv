@@ -122,9 +122,22 @@ static void mount_routes(httplib::Server& svr,
     });
 
     // -------------------------------------------------------------------------
+    // GET /get/token
+    // Returns server token for Web GUI authentication
+    // Security: Should only be accessible from same origin (CORS protected)
+    // -------------------------------------------------------------------------
+    svr.Get("/get/token", [&logger, &token](const httplib::Request& req, httplib::Response& res)
+    {
+        std::string client_ip = get_client_ip(req);
+        json body = { {"token", token} };
+        json_resp(res, body);
+        logger.log_request("GET", "/get/token", client_ip, "", 200, body.dump());
+    });
+
+    // -------------------------------------------------------------------------
     // POST /post/run
     // Body: { "cmd": "...", "args": {...}, "timeout_ms": 5000 }
-    // For "call_shell" command: { "cmd": "call_shell", "args": {...}, "token": "..." }
+    // For authenticated commands, args must include: { "token": "..." }
     // -------------------------------------------------------------------------
     svr.Post("/post/run", [&e, &active, &logger, &token](const httplib::Request& req, httplib::Response& res)
     {
@@ -162,21 +175,6 @@ static void mount_routes(httplib::Server& svr,
                 json_resp(res, err, status);
                 logger.log_request("POST", "/post/run", client_ip, req.body, status, resp_body);
                 return;
-            }
-
-            // Auto-inject token for commands that require authentication
-            // This allows web GUI to work without knowing the token
-            const std::vector<std::string> token_required_cmds = {
-                "call_shell", "get_global_json", "set_global_json"
-            };
-            
-            if (std::find(token_required_cmds.begin(), token_required_cmds.end(), cmd) != token_required_cmds.end())
-            {
-                if (!token.empty())
-                {
-                    // Auto-inject server's token into args
-                    args["token"] = token;
-                }
             }
 
             Result r = e.run(cmd, args, std::chrono::milliseconds(tms));
