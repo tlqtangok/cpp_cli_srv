@@ -13,7 +13,8 @@
 int main(int argc, char* argv[])
 {
     Engine e;
-    register_all(e);
+    // Use default token "jd" for CLI mode (same as server default)
+    register_all(e, "jd");
 
     std::string cmd, args_str;
     bool schema_mode = false;
