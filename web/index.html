@@ -63,7 +63,7 @@
       <input type="text" id="cmdInput" placeholder="e.g. echo" oninput="updateCurl()" />
     </div>
     <div>
-      <label>Args (JSON) <span style="color:#718096;font-size:.75rem">(must provide valid "token" for authenticated commands)</span></label>
+      <label>Args (JSON) <span style="color:#718096;font-size:.75rem">(token auto-filled from last success for debugging)</span></label>
       <textarea id="argsInput" rows="8" placeholder='{"text": "hello"}' oninput="updateCurl()"></textarea>
     </div>
     <div>
@@ -92,6 +92,21 @@ const API = '';   // 同源，无需前缀
 
 // Curl OS preference (default: linux)
 let curlOS = localStorage.getItem('curl_os') || 'linux';
+
+// Token cache for debugging convenience
+// Saved to localStorage when a command succeeds with valid token
+const TOKEN_CACHE_KEY = 'debug_token';
+const AUTHENTICATED_COMMANDS = ['call_shell', 'get_global_json', 'set_global_json', 'patch_global_json'];
+
+function getCachedToken() {
+  return localStorage.getItem(TOKEN_CACHE_KEY) || '';
+}
+
+function saveToken(token) {
+  if (token && token.trim()) {
+    localStorage.setItem(TOKEN_CACHE_KEY, token);
+  }
+}
 
 async function loadSchema() {
   try {
@@ -122,6 +137,15 @@ function fillCmd(c) {
   c.args.forEach(a => {
     sample[a.name] = ('default' in a) ? a.default : (a.required ? `<${a.name}>` : '');
   });
+  
+  // Auto-fill cached token for authenticated commands (debugging convenience)
+  if (AUTHENTICATED_COMMANDS.includes(c.name)) {
+    const cachedToken = getCachedToken();
+    if (cachedToken && sample.hasOwnProperty('token')) {
+      sample.token = cachedToken;
+    }
+  }
+  
   document.getElementById('argsInput').value = JSON.stringify(sample, null, 2);
   document.querySelectorAll('.cmd-btn').forEach(b => b.classList.toggle('active', b.textContent === c.name));
   updateCurl();
@@ -280,6 +304,12 @@ async function runCmd() {
     const isSuccess = data.code === 0;
     box.className = 'result-box' + (isSuccess ? '' : ' err');
     box.textContent = JSON.stringify(data, null, 2);
+    
+    // Save token to localStorage when authenticated command succeeds
+    // This enables auto-fill for debugging convenience
+    if (isSuccess && AUTHENTICATED_COMMANDS.includes(cmd) && args.token) {
+      saveToken(args.token);
+    }
   } catch(e) {
     box.className = 'result-box err';
     box.textContent = 'fetch error: ' + e.message;
