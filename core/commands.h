@@ -297,4 +297,149 @@ inline void register_all(Engine& e)
     // Add your own commands below...
     // Sync:  e.reg(       {name, desc, {args...}},        [](const json& args) -> Result { ... });
     // Async: e.reg_async( {name, desc, {args...}, true},  [](const json& args) -> std::future<Result> { ... });
+
+    // -------------------------------------------------------------------------
+    // get_global_json - Get global JSON (entire or by path)
+    //
+    // Retrieves the global JSON variable that is stored in memory.
+    //
+    // Arguments:
+    //   - path: Optional JSON pointer path (RFC 6901), e.g., "/a/b/c"
+    //
+    // Returns:
+    //   - Success: {"code":0, "output":{...json...}, "error":""}
+    //   - Error: {"code":1, "output":"", "error":"error message"}
+    //
+    // Examples:
+    //   {"cmd":"get_global_json","args":{}}
+    //   {"cmd":"get_global_json","args":{"path":"/user/name"}}
+    // -------------------------------------------------------------------------
+    e.reg(
+        { "get_global_json", "Get global JSON (entire or by path)",
+          { {"path", "JSON pointer path (optional, e.g., /a/b/c)", false, ""} } },
+        [&e](const json& args) -> Result
+        {
+            try {
+                std::string path = args.value("path", "");
+                
+                json result;
+                if (path.empty()) {
+                    result = e.get_global_json();
+                } else {
+                    result = e.get_global_json_path(path);
+                    if (result.is_null()) {
+                        return { 1, "", "path not found: " + path };
+                    }
+                }
+                
+                return { 0, result.dump(), "" };
+            } catch (const std::exception& ex) {
+                return { 3, "", std::string("exception: ") + ex.what() };
+            }
+        }
+    );
+
+    // -------------------------------------------------------------------------
+    // set_global_json - Replace entire global JSON
+    //
+    // Sets the global JSON variable to a new value.
+    //
+    // Arguments:
+    //   - value: New JSON value (required)
+    //
+    // Returns:
+    //   - Success: {"code":0, "output":"Global JSON updated", "error":""}
+    //   - Error: {"code":1, "output":"", "error":"error message"}
+    //
+    // Examples:
+    //   {"cmd":"set_global_json","args":{"value":{"key":"value","count":42}}}
+    // -------------------------------------------------------------------------
+    e.reg(
+        { "set_global_json", "Replace entire global JSON",
+          { {"value", "New JSON value", true, json::object({{"example","value"}})} } },
+        [&e](const json& args) -> Result
+        {
+            try {
+                if (!args.contains("value")) {
+                    return { 1, "", "value is required" };
+                }
+                
+                e.set_global_json(args["value"]);
+                return { 0, "Global JSON updated", "" };
+            } catch (const std::exception& ex) {
+                return { 3, "", std::string("exception: ") + ex.what() };
+            }
+        }
+    );
+
+    // -------------------------------------------------------------------------
+    // patch_global_json - Apply JSON merge patch (RFC 7386)
+    //
+    // Applies a merge patch to the global JSON and returns a diff.
+    //
+    // Arguments:
+    //   - patch: JSON merge patch to apply (required)
+    //
+    // Returns:
+    //   - Success: {"code":0, "output":{diff}, "error":""}
+    //     where diff contains: {"before":{...}, "after":{...}, "patch_applied":{...}}
+    //
+    // Merge Patch Rules (RFC 7386):
+    //   - If patch value is object, recursively merge
+    //   - If patch value is null, delete the key
+    //   - Otherwise, replace the value
+    //
+    // Examples:
+    //   Current: {"a":1, "b":{"c":2, "d":3}}
+    //   Patch:   {"b":{"c":999, "e":4}}
+    //   Result:  {"a":1, "b":{"c":999, "d":3, "e":4}}
+    //
+    //   {"cmd":"patch_global_json","args":{"patch":{"user":{"name":"Alice","age":30}}}}
+    // -------------------------------------------------------------------------
+    e.reg(
+        { "patch_global_json", "Apply JSON merge patch and return diff",
+          { {"patch", "JSON merge patch to apply", true, json::object({{"key","value"}})} } },
+        [&e](const json& args) -> Result
+        {
+            try {
+                if (!args.contains("patch")) {
+                    return { 1, "", "patch is required" };
+                }
+                
+                json diff = e.patch_global_json(args["patch"]);
+                return { 0, diff.dump(), "" };
+            } catch (const std::exception& ex) {
+                return { 3, "", std::string("exception: ") + ex.what() };
+            }
+        }
+    );
+
+    // -------------------------------------------------------------------------
+    // persist_global_json - Force save global JSON to disk
+    //
+    // Manually triggers a save of the global JSON to data/GLOBAL_JSON.json.
+    // Note: The global JSON is automatically saved after each modification,
+    // so this command is typically only needed for manual checkpoints.
+    //
+    // Arguments: None
+    //
+    // Returns:
+    //   - Success: {"code":0, "output":"Global JSON persisted to disk", "error":""}
+    //
+    // Examples:
+    //   {"cmd":"persist_global_json","args":{}}
+    // -------------------------------------------------------------------------
+    e.reg(
+        { "persist_global_json", "Force save global JSON to disk",
+          { } },
+        [&e](const json& args) -> Result
+        {
+            try {
+                e.save_global_json();
+                return { 0, "Global JSON persisted to disk", "" };
+            } catch (const std::exception& ex) {
+                return { 3, "", std::string("exception: ") + ex.what() };
+            }
+        }
+    );
 }

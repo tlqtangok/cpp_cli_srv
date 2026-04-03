@@ -11,6 +11,10 @@
 
 using json = nlohmann::json;
 
+// Forward declarations for file I/O
+#include <fstream>
+#include <filesystem>
+
 // ---------------------------------------------------------------------------
 // ArgDef
 // ---------------------------------------------------------------------------
@@ -93,6 +97,12 @@ using AsyncHandler = std::function<std::future<Result>(const json& args)>;
 class Engine
 {
 public:
+    // Constructor - load global JSON on startup
+    Engine()
+    {
+        load_global_json();
+    }
+
     // Register a synchronous (fast) command
     void reg(const CmdDef& def, SyncHandler handler)
     {
@@ -177,6 +187,95 @@ public:
         return out;
     }
 
+    // ---------------------------------------------------------------------------
+    // Global JSON Management
+    // ---------------------------------------------------------------------------
+    
+    // Get entire global JSON
+    json get_global_json() const
+    {
+        std::shared_lock<std::shared_mutex> lock(global_json_mutex_);
+        return global_json_;
+    }
+    
+    // Get value at JSON pointer path (RFC 6901)
+    json get_global_json_path(const std::string& path) const
+    {
+        std::shared_lock<std::shared_mutex> lock(global_json_mutex_);
+        try {
+            return global_json_.at(json::json_pointer(path));
+        } catch (...) {
+            return nullptr;
+        }
+    }
+    
+    // Set entire global JSON
+    void set_global_json(const json& new_val)
+    {
+        {
+            std::unique_lock<std::shared_mutex> lock(global_json_mutex_);
+            global_json_ = new_val;
+        }
+        save_global_json();
+    }
+    
+    // Apply merge patch (RFC 7386) and return diff
+    json patch_global_json(const json& patch)
+    {
+        json before, after;
+        {
+            std::unique_lock<std::shared_mutex> lock(global_json_mutex_);
+            before = global_json_;
+            global_json_.merge_patch(patch);
+            after = global_json_;
+        }
+        save_global_json();
+        
+        // Generate diff (simple before/after comparison)
+        json diff;
+        diff["before"] = before;
+        diff["after"] = after;
+        diff["patch_applied"] = patch;
+        return diff;
+    }
+    
+    // Save global JSON to disk
+    void save_global_json()
+    {
+        std::shared_lock<std::shared_mutex> lock(global_json_mutex_);
+        try {
+            // Ensure data directory exists
+            std::filesystem::create_directories("data");
+            
+            std::ofstream file(global_json_path_);
+            if (file.is_open()) {
+                file << global_json_.dump(2) << std::endl;
+                file.close();
+            }
+        } catch (...) {
+            // Silently fail - persistence is best-effort
+        }
+    }
+    
+    // Load global JSON from disk
+    void load_global_json()
+    {
+        std::unique_lock<std::shared_mutex> lock(global_json_mutex_);
+        try {
+            std::ifstream file(global_json_path_);
+            if (file.is_open()) {
+                file >> global_json_;
+                file.close();
+            } else {
+                // File doesn't exist - initialize as empty object
+                global_json_ = json::object();
+            }
+        } catch (...) {
+            // Parse error or file not found - initialize as empty object
+            global_json_ = json::object();
+        }
+    }
+
 private:
     void _reg(const CmdDef& def, AsyncHandler handler)
     {
@@ -190,4 +289,9 @@ private:
     std::vector<CmdDef>                                defs_;
     std::unordered_map<std::string, AsyncHandler>      handlers_;
     std::unordered_map<std::string, CmdDef>            def_map_;
+    
+    // Global JSON state
+    mutable std::shared_mutex                          global_json_mutex_;
+    json                                               global_json_;
+    std::string                                        global_json_path_ = "data/GLOBAL_JSON.json";
 };

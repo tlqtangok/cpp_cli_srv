@@ -352,6 +352,7 @@ Open `http://localhost:8080` — it reads `/get/schema` on load and auto-builds 
 | **Shell tests** | `test_shell.bat` | `./test_shell.sh` | Test call_shell command |
 | **Token tests** | `test_token.bat` | `./test_token.sh` | Token authentication tests |
 | **JSON tests** | `test_json.bat` | `./test_json.sh` | JSON file I/O tests |
+| **Global JSON** | `test_global_json.bat` | `./test_global_json.sh` | Global JSON variable tests |
 | **Concurrency** | `test_concurrent.bat` | `./test_comprehensive.sh` | Concurrency & timeout tests |
 | **IPv6 tests** | `test_ipv6.bat` | (included in test_server.sh) | Dual-stack IPv4/IPv6 tests |
 | **Logging tests** | - | `./test_logging.sh` | Server logging verification |
@@ -375,6 +376,94 @@ test_server.bat
 **Note:** 
 - Linux `test_server.sh` auto-detects the server port from the running process
 - Windows `test_ipv6.bat` uses `curl --noproxy "*"` to bypass system HTTP proxy for localhost IPv6 connections
+
+---
+
+## Global JSON Variable
+
+The system provides a **global JSON variable** that persists in memory (server) or on disk (CLI):
+
+### Features
+- **In-memory storage** with automatic disk persistence
+- **Thread-safe** concurrent access (server mode)
+- **JSON Merge Patch** (RFC 7386) for updates
+- **Diff tracking** on modifications
+- **HTTP/HTTPS endpoints** and CLI commands
+
+### Server Behavior
+- Loads `data/GLOBAL_JSON.json` on startup
+- Keeps JSON in memory for fast access
+- Auto-saves to disk after each modification
+- Survives server restarts
+
+### CLI Behavior
+- Direct file operations on `data/GLOBAL_JSON.json`
+- No in-memory cache (loads/saves per command)
+
+### HTTP Endpoints
+
+```bash
+# Get entire global JSON
+curl http://localhost:8080/get/global
+
+# Get specific path
+curl "http://localhost:8080/get/global/path?path=/user/name"
+
+# Replace entire JSON
+curl -X POST http://localhost:8080/post/global \
+  -H "Content-Type: application/json" \
+  -d '{"value":{"name":"Alice","age":30}}'
+
+# Apply merge patch (returns diff)
+curl -X POST http://localhost:8080/post/global/patch \
+  -H "Content-Type: application/json" \
+  -d '{"patch":{"age":31,"city":"NYC"}}'
+
+# Force save to disk
+curl -X POST http://localhost:8080/post/global/persist
+```
+
+### CLI Commands
+
+```bash
+# Get entire JSON
+./build/cpp_cli --cmd get_global_json --args '{}'
+
+# Get specific path
+./build/cpp_cli --cmd get_global_json --args '{"path":"/user/name"}'
+
+# Set entire JSON
+./build/cpp_cli --cmd set_global_json --args '{"value":{"name":"Bob"}}'
+
+# Apply merge patch
+./build/cpp_cli --cmd patch_global_json --args '{"patch":{"age":25}}'
+
+# Force persist
+./build/cpp_cli --cmd persist_global_json --args '{}'
+```
+
+### Merge Patch Example
+
+```json
+// Current state
+{"name": "Alice", "age": 30, "city": "SF"}
+
+// Apply patch
+{"age": 31, "city": null, "country": "USA"}
+
+// Result
+{"name": "Alice", "age": 31, "country": "USA"}
+// Note: "city" was deleted (null value)
+```
+
+### Use Cases
+- **Configuration management**: Store app settings
+- **Feature flags**: Dynamic toggles without restart
+- **State storage**: Persistent application state
+- **Counters/metrics**: Track values across requests
+- **User preferences**: Per-user or global settings
+
+See [API_FORMAT.md](API_FORMAT.md) for complete API documentation.
 
 ---
 

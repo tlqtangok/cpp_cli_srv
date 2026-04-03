@@ -213,3 +213,298 @@ if (response.code === 0) {
 ### Fallback Behavior
 
 If the output starts with `{` or `[` but is not valid JSON, it remains as a string. This ensures robustness.
+
+---
+
+# Global JSON Variable API
+
+## Overview
+
+The system provides a global JSON variable (`GLOBAL_JSON`) that persists across requests:
+- **Server**: In-memory JSON with automatic disk persistence
+- **CLI**: Direct file operations on `data/GLOBAL_JSON.json`
+- **File location**: `data/GLOBAL_JSON.json`
+
+## HTTP Endpoints
+
+### GET /get/global
+Get the entire global JSON.
+
+**Request**: None
+
+**Response**:
+```json
+{
+  "code": 0,
+  "output": {
+    "name": "Alice",
+    "age": 30,
+    "city": "NYC"
+  },
+  "error": ""
+}
+```
+
+**Example**:
+```bash
+curl http://localhost:8080/get/global
+```
+
+---
+
+### GET /get/global/path
+Get a value at a specific JSON pointer path (RFC 6901).
+
+**Query Parameters**:
+- `path` (required): JSON pointer path (e.g., `/user/name`, `/config/theme`)
+
+**Response** (success):
+```json
+{
+  "code": 0,
+  "output": "Alice",
+  "error": ""
+}
+```
+
+**Response** (path not found):
+```json
+{
+  "code": 1,
+  "output": "",
+  "error": "path not found: /nonexistent"
+}
+```
+
+**Examples**:
+```bash
+# Get top-level field
+curl "http://localhost:8080/get/global/path?path=/name"
+
+# Get nested field
+curl "http://localhost:8080/get/global/path?path=/config/theme"
+```
+
+---
+
+### POST /post/global
+Replace the entire global JSON with a new value.
+
+**Request Body**:
+```json
+{
+  "value": {
+    "product": "Widget",
+    "price": 99.99,
+    "stock": 100
+  }
+}
+```
+
+**Response**:
+```json
+{
+  "code": 0,
+  "output": "Global JSON updated",
+  "error": ""
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://localhost:8080/post/global \
+  -H "Content-Type: application/json" \
+  -d '{"value":{"name":"Bob","age":25}}'
+```
+
+---
+
+### POST /post/global/patch
+Apply a JSON merge patch (RFC 7386) to the global JSON.
+
+**Request Body**:
+```json
+{
+  "patch": {
+    "age": 31,
+    "city": "NYC",
+    "config": {
+      "theme": "light"
+    }
+  }
+}
+```
+
+**Response** (includes diff):
+```json
+{
+  "code": 0,
+  "output": {
+    "before": {
+      "name": "Alice",
+      "age": 30
+    },
+    "after": {
+      "name": "Alice",
+      "age": 31,
+      "city": "NYC",
+      "config": {
+        "theme": "light"
+      }
+    },
+    "patch_applied": {
+      "age": 31,
+      "city": "NYC",
+      "config": {
+        "theme": "light"
+      }
+    }
+  },
+  "error": ""
+}
+```
+
+**Merge Patch Rules** (RFC 7386):
+- If patch value is an **object**, recursively merge with existing object
+- If patch value is **null**, delete the key
+- Otherwise, replace the value
+
+**Examples**:
+```bash
+# Update existing fields and add new ones
+curl -X POST http://localhost:8080/post/global/patch \
+  -H "Content-Type: application/json" \
+  -d '{"patch":{"age":31,"city":"NYC"}}'
+
+# Delete a field (set to null)
+curl -X POST http://localhost:8080/post/global/patch \
+  -H "Content-Type: application/json" \
+  -d '{"patch":{"city":null}}'
+
+# Nested merge
+curl -X POST http://localhost:8080/post/global/patch \
+  -H "Content-Type: application/json" \
+  -d '{"patch":{"config":{"theme":"dark","lang":"en"}}}'
+```
+
+**Merge Patch Example**:
+```
+Current: {"a": 1, "b": {"c": 2, "d": 3}}
+Patch:   {"b": {"c": 999, "e": 4}}
+Result:  {"a": 1, "b": {"c": 999, "d": 3, "e": 4}}
+```
+
+---
+
+### POST /post/global/persist
+Manually force save the global JSON to disk.
+
+**Note**: The global JSON is automatically saved after each modification (set/patch), so this endpoint is typically only needed for manual checkpoints.
+
+**Request**: None
+
+**Response**:
+```json
+{
+  "code": 0,
+  "output": "Global JSON persisted to disk",
+  "error": ""
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://localhost:8080/post/global/persist
+```
+
+---
+
+## CLI Commands
+
+All global JSON operations are available via CLI commands:
+
+### get_global_json
+Get the entire global JSON or a specific path.
+
+```bash
+# Get entire JSON
+./cpp_cli --cmd get_global_json --args '{}'
+
+# Get specific path
+./cpp_cli --cmd get_global_json --args '{"path":"/user/name"}'
+```
+
+---
+
+### set_global_json
+Replace the entire global JSON.
+
+```bash
+./cpp_cli --cmd set_global_json --args '{"value":{"name":"Alice","age":30}}'
+```
+
+---
+
+### patch_global_json
+Apply a merge patch and get the diff.
+
+```bash
+./cpp_cli --cmd patch_global_json --args '{"patch":{"age":31,"city":"NYC"}}'
+```
+
+**Response includes before/after diff**:
+```json
+{
+  "code": 0,
+  "output": {
+    "before": {"name":"Alice","age":30},
+    "after": {"name":"Alice","age":31,"city":"NYC"},
+    "patch_applied": {"age":31,"city":"NYC"}
+  },
+  "error": ""
+}
+```
+
+---
+
+### persist_global_json
+Force save to disk.
+
+```bash
+./cpp_cli --cmd persist_global_json --args '{}'
+```
+
+---
+
+## Persistence Behavior
+
+### Server Mode
+- **On startup**: Loads `data/GLOBAL_JSON.json` into memory
+- **On modification**: Automatically saves to disk after each `set` or `patch`
+- **On shutdown**: State is preserved in `data/GLOBAL_JSON.json`
+- **If file missing**: Initializes as empty object `{}`
+
+### CLI Mode
+- **No in-memory cache**: Each command loads, modifies, and saves the file
+- **Direct file operations**: Operates directly on `data/GLOBAL_JSON.json`
+
+---
+
+## Use Cases
+
+1. **Configuration Management**: Store app configuration that persists across restarts
+2. **State Storage**: Maintain application state in memory with disk backup
+3. **Feature Flags**: Dynamic feature toggles without redeployment
+4. **Counters/Metrics**: Track values that need to persist
+5. **User Preferences**: Store per-user settings
+6. **Cache**: Quick in-memory lookup with persistence
+
+---
+
+## Thread Safety
+
+All global JSON operations are thread-safe:
+- Uses `std::shared_mutex` for concurrent read/exclusive write access
+- Multiple readers can access simultaneously
+- Writers have exclusive access during modifications
+- Safe for concurrent HTTP requests
