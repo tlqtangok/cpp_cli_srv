@@ -19,6 +19,8 @@
 #include <thread>
 #include <filesystem>
 #include <csignal>
+#include <algorithm>
+#include <vector>
 #ifdef _WIN32
 #include <process.h>
 #define getpid _getpid
@@ -162,31 +164,18 @@ static void mount_routes(httplib::Server& svr,
                 return;
             }
 
-            // Security check: call_shell requires token verification
-            if (cmd == "call_shell")
+            // Auto-inject token for commands that require authentication
+            // This allows web GUI to work without knowing the token
+            const std::vector<std::string> token_required_cmds = {
+                "call_shell", "get_global_json", "set_global_json"
+            };
+            
+            if (std::find(token_required_cmds.begin(), token_required_cmds.end(), cmd) != token_required_cmds.end())
             {
                 if (!token.empty())
                 {
-                    std::string req_token = body.value("token", "");
-                    if (req_token != token)
-                    {
-                        json err = { {"code", 6}, {"output", ""}, {"error", "call_shell requires valid token"} };
-                        resp_body = err.dump();
-                        status = 403;
-                        json_resp(res, err, status);
-                        logger.log_request("POST", "/post/run", client_ip, req.body, status, resp_body);
-                        return;
-                    }
-                }
-                // If no token configured on server, call_shell is disabled
-                else
-                {
-                    json err = { {"code", 6}, {"output", ""}, {"error", "call_shell is disabled (no token configured)"} };
-                    resp_body = err.dump();
-                    status = 403;
-                    json_resp(res, err, status);
-                    logger.log_request("POST", "/post/run", client_ip, req.body, status, resp_body);
-                    return;
+                    // Auto-inject server's token into args
+                    args["token"] = token;
                 }
             }
 

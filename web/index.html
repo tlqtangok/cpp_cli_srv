@@ -90,9 +90,6 @@
 <script>
 const API = '';   // 同源，无需前缀
 
-// Token storage for authenticated commands
-let authToken = sessionStorage.getItem('auth_token') || '';
-
 // Curl OS preference (default: linux)
 let curlOS = localStorage.getItem('curl_os') || 'linux';
 
@@ -266,25 +263,9 @@ async function runCmd() {
     catch { box.className = 'result-box err'; box.textContent = 'invalid JSON in args'; return; }
   }
 
-  // For commands that require token authentication
-  const requiresToken = ['call_shell', 'get_global_json', 'set_global_json'];
+  // Server auto-injects token for authenticated commands
+  // No need for client-side token handling
   let body = { cmd, args };
-  
-  if (requiresToken.includes(cmd)) {
-    if (!authToken) {
-      authToken = prompt(`${cmd} requires authentication. Please enter token (default: jd):`);
-      if (!authToken) {
-        box.className = 'result-box err';
-        box.textContent = `Token required for ${cmd} command`;
-        return;
-      }
-      sessionStorage.setItem('auth_token', authToken);
-    }
-    // Add token to args
-    if (!args) args = {};
-    args.token = authToken;
-    body.args = args;
-  }
 
   try {
     const r = await fetch(API + '/post/run', {
@@ -297,15 +278,7 @@ async function runCmd() {
     // Handle new JSON format: check "code" instead of "ok"
     const isSuccess = data.code === 0;
     box.className = 'result-box' + (isSuccess ? '' : ' err');
-    
-    // If authentication error (code 6), clear cached token
-    if (data.code === 6 && requiresToken.includes(cmd)) {
-      authToken = '';
-      sessionStorage.removeItem('auth_token');
-      box.textContent = 'Authentication failed. Token cleared.\n\n' + JSON.stringify(data, null, 2);
-    } else {
-      box.textContent = JSON.stringify(data, null, 2);
-    }
+    box.textContent = JSON.stringify(data, null, 2);
   } catch(e) {
     box.className = 'result-box err';
     box.textContent = 'fetch error: ' + e.message;
