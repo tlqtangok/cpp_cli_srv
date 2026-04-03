@@ -393,7 +393,12 @@ The system provides a **global JSON variable** that persists in memory (server) 
 ### Server Behavior
 - Loads `data/GLOBAL_JSON.json` on startup
 - Keeps JSON in memory for fast access
-- Auto-saves to disk after each modification
+- **Deferred persistence**: Batches writes to disk with 15-minute delay + CPU awareness
+  - Memory updates are immediate (in-process)
+  - Disk writes delayed for 15 minutes to allow multiple edits to batch into a single I/O operation
+  - When disk write is ready, checks CPU usage: only writes if CPU < 50%
+  - Max 20 minutes total wait before forced write (even if CPU high)
+  - Rationale: Reduces I/O load during intensive write periods, improves performance
 - Survives server restarts
 
 ### CLI Behavior

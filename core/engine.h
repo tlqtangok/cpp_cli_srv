@@ -297,7 +297,8 @@ public:
         #endif
     }
     
-    // Schedule deferred save: wait 5s then write when CPU < 50%
+    // Schedule deferred save: wait 15min then write when CPU < 50%
+    // Longer delay allows intensive write operations to batch together
     void schedule_save_global_json()
     {
         // Cancel previous pending save
@@ -307,12 +308,13 @@ public:
         
         // Schedule new async save task
         save_task_ = std::async(std::launch::async, [this]() {
-            // Wait 5 seconds
-            std::this_thread::sleep_for(std::chrono::seconds(5));
+            // Wait 15 minutes (900 seconds) before attempting disk write
+            // This batches multiple edits into a single I/O operation
+            std::this_thread::sleep_for(std::chrono::seconds(900));
             
-            // Wait for CPU to drop below 50%, max 60 seconds total
+            // Wait for CPU to drop below 50%, max 20 minutes total wait
             auto start = std::chrono::steady_clock::now();
-            auto timeout = std::chrono::seconds(60);
+            auto timeout = std::chrono::seconds(1200);  // 20 minutes max
             
             while (std::chrono::steady_clock::now() - start < timeout) {
                 double cpu_usage = get_cpu_usage();
@@ -325,7 +327,7 @@ public:
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
             
-            // Timeout: force write anyway
+            // Timeout: force write anyway (20 min total wait)
             save_global_json();
         });
     }
