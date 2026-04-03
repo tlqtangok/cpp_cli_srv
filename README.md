@@ -343,6 +343,53 @@ Open `http://localhost:8080` — it reads `/get/schema` on load and auto-builds 
 
 ---
 
+## Performance Benchmarks
+
+Performance test using `node test_req.js` (10,000 sequential requests to `get_global_json`):
+
+```
+┌─────────────────────────────────────────┐
+│          SUMMARY STATISTICS             │
+├─────────────────────────┬───────────────┤
+│ Total Requests          │         10000 │
+│ Successful              │         10000 │
+│ Failed                  │             0 │
+│ Success Rate            │       100.00% │
+│ Total Time              │    1719.00 ms │
+│ Requests/sec            │       5817.34 │
+└─────────────────────────┴───────────────┘
+
+┌─────────────────────────────────────────┐
+│       RESPONSE TIME (ms)                │
+├─────────────────────────┬───────────────┤
+│ Minimum                 │          0.00 │
+│ Maximum                 │         26.00 │
+│ Average                 │          0.16 │
+│ Median                  │          0.00 │
+│ 95th Percentile         │          1.00 │
+│ 99th Percentile         │          1.00 │
+└─────────────────────────┴───────────────┘
+
+┌─────────────────────────────────────────┐
+│     RESPONSE TIME DISTRIBUTION          │
+├─────────────────────────┬───────────────┤
+│ < 10ms                  │          9999 │
+│ 10-19ms                 │             0 │
+│ 20-49ms                 │             1 │
+│ >= 50ms                 │             0 │
+└─────────────────────────┴───────────────┘
+```
+
+**Key Metrics:**
+- **Throughput**: ~5,800 requests/second (sequential)
+- **Latency**: Sub-millisecond median response (0.16ms avg)
+- **Reliability**: 100% success rate
+- **P95/P99**: 1ms (consistent low-latency performance)
+
+Tested on: Linux with 20 threads, HTTP server, in-memory global JSON access.
+
+---
+
 ## Running Tests
 
 | Test Type | Windows | Linux | Description |
