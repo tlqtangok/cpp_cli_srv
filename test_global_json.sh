@@ -71,7 +71,7 @@ echo -e "${BLUE}--- CLI Tests ---${NC}"
 
 # Test 1: Get empty global JSON (should be {})
 echo -n "Test 1: Get empty global JSON... "
-RESULT=$(./build/cpp_cli --cmd get_global_json --args '{}')
+RESULT=$(./build/cpp_cli --cmd get_global_json --args '{"token":"jd"}')
 if echo "$RESULT" | jq -e '.code == 0 and .output == {}' > /dev/null; then
     echo -e "${GREEN}PASS${NC}"
     TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -95,7 +95,7 @@ TESTS_TOTAL=$((TESTS_TOTAL + 1))
 
 # Test 3: Verify set worked
 echo -n "Test 3: Verify global JSON was set... "
-RESULT=$(./build/cpp_cli --cmd get_global_json --args '{}')
+RESULT=$(./build/cpp_cli --cmd get_global_json --args '{"token":"jd"}')
 if echo "$RESULT" | jq -e '.code == 0 and .output.name == "Alice" and .output.age == 30' > /dev/null; then
     echo -e "${GREEN}PASS${NC}"
     TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -107,7 +107,7 @@ TESTS_TOTAL=$((TESTS_TOTAL + 1))
 
 # Test 4: Get by path
 echo -n "Test 4: Get value by path... "
-RESULT=$(./build/cpp_cli --cmd get_global_json --args '{"path":"/name"}')
+RESULT=$(./build/cpp_cli --cmd get_global_json --args '{"path":"/name","token":"jd"}')
 # Note: output is JSON-encoded string, so it will be "\"Alice\"" when dumped
 if echo "$RESULT" | jq -e '.code == 0 and (.output == "Alice" or .output == "\"Alice\"")' > /dev/null; then
     echo -e "${GREEN}PASS${NC}"
@@ -120,7 +120,7 @@ TESTS_TOTAL=$((TESTS_TOTAL + 1))
 
 # Test 5: Get nested path
 echo -n "Test 5: Get nested path... "
-RESULT=$(./build/cpp_cli --cmd get_global_json --args '{"path":"/config/theme"}')
+RESULT=$(./build/cpp_cli --cmd get_global_json --args '{"path":"/config/theme","token":"jd"}')
 # Note: output is JSON-encoded string
 if echo "$RESULT" | jq -e '.code == 0 and (.output == "dark" or .output == "\"dark\"")' > /dev/null; then
     echo -e "${GREEN}PASS${NC}"
@@ -146,7 +146,7 @@ TESTS_TOTAL=$((TESTS_TOTAL + 1))
 
 # Test 7: Verify patch was applied
 echo -n "Test 7: Verify patch was applied... "
-RESULT=$(./build/cpp_cli --cmd get_global_json --args '{}')
+RESULT=$(./build/cpp_cli --cmd get_global_json --args '{"token":"jd"}')
 if echo "$RESULT" | jq -e '.code == 0 and .output.age == 31 and .output.city == "NYC" and .output.name == "Alice"' > /dev/null; then
     echo -e "${GREEN}PASS${NC}"
     TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -182,7 +182,7 @@ TESTS_TOTAL=$((TESTS_TOTAL + 1))
 echo -n "Test 10: Delete key with null patch... "
 RESULT=$(./build/cpp_cli --cmd patch_global_json --args '{"city":null}')
 if echo "$RESULT" | jq -e '.code == 0' > /dev/null; then
-    RESULT2=$(./build/cpp_cli --cmd get_global_json --args '{}')
+    RESULT2=$(./build/cpp_cli --cmd get_global_json --args '{"token":"jd"}')
     if echo "$RESULT2" | jq -e '.output | has("city") | not' > /dev/null; then
         echo -e "${GREEN}PASS${NC}"
         TESTS_PASSED=$((TESTS_PASSED + 1))

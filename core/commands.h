@@ -92,37 +92,49 @@ inline void register_all(Engine& e, const std::string& token = "")
     );
 
     // -------------------------------------------------------------------------
-    // call_shell - ASYNC command execution
+    // -------------------------------------------------------------------------
+    // call_shell - ASYNC command execution (TOKEN REQUIRED)
     //
     // Executes shell commands on the host system:
     //   - Windows: runs as CMD command (e.g., "dir", "type file.txt")
     //   - Linux:   runs as bash command (e.g., "ls", "cat file.txt")
     //
-    // Security Warning: This command executes arbitrary shell commands.
-    // In production, consider:
-    //   - Whitelisting allowed commands
-    //   - Input sanitization
-    //   - Running with restricted user permissions
-    //   - Adding authentication/authorization
+    // SECURITY: Requires token authentication.
+    //
+    // Arguments:
+    //   - command: Shell command to execute (required)
+    //   - token: Security token (required if server has token enabled)
     //
     // Examples:
-    //   Windows: {"cmd":"call_shell","args":{"command":"where cmd"}}
-    //   Linux:   {"cmd":"call_shell","args":{"command":"cat /etc/*release"}}
+    //   Windows: {"cmd":"call_shell","args":{"command":"where cmd","token":"jd"}}
+    //   Linux:   {"cmd":"call_shell","args":{"command":"ls -la","token":"jd"}}
     // -------------------------------------------------------------------------
     
     // Set platform-specific default example command
     #ifdef _WIN32
         std::string default_shell_cmd = "where cmd";
     #else
-        std::string default_shell_cmd = "cat /etc/*release";
+        std::string default_shell_cmd = "ls -la";
     #endif
     
     e.reg_async(
-        { "call_shell", "Execute a shell command (Windows: CMD, Linux: bash)",
-          { {"command", "shell command to execute", true, default_shell_cmd} },
+        { "call_shell", "Execute shell command (requires token)",
+          { {"command", "shell command to execute", true, default_shell_cmd},
+            {"token", "Security token", false, ""} },
           /* is_async = */ true },
-        [](const json& args) -> std::future<Result>
+        [token](const json& args) -> std::future<Result>
         {
+            // Token authentication
+            if (!token.empty()) {
+                std::string req_token = args.value("token", "");
+                if (req_token != token) {
+                    auto fut = std::async(std::launch::deferred, []() -> Result {
+                        return { 6, "", "call_shell requires valid token" };
+                    });
+                    return fut;
+                }
+            }
+            
             std::string command = args.value("command", "");
             
             return std::async(std::launch::async, [command]() -> Result
@@ -299,27 +311,39 @@ inline void register_all(Engine& e, const std::string& token = "")
     // Async: e.reg_async( {name, desc, {args...}, true},  [](const json& args) -> std::future<Result> { ... });
 
     // -------------------------------------------------------------------------
-    // get_global_json - Get global JSON (entire or by path)
+    // get_global_json - Get global JSON (TOKEN REQUIRED)
     //
     // Retrieves the global JSON variable that is stored in memory.
     //
+    // SECURITY: Requires token authentication.
+    //
     // Arguments:
     //   - path: Optional JSON pointer path (RFC 6901), e.g., "/a/b/c"
+    //   - token: Security token (required if server has token enabled)
     //
     // Returns:
     //   - Success: {"code":0, "output":{...json...}, "error":""}
-    //   - Error: {"code":1, "output":"", "error":"error message"}
+    //   - Error: {"code":6, "output":"", "error":"authentication error"}
     //
     // Examples:
-    //   {"cmd":"get_global_json","args":{}}
-    //   {"cmd":"get_global_json","args":{"path":"/user/name"}}
+    //   {"cmd":"get_global_json","args":{"token":"jd"}}
+    //   {"cmd":"get_global_json","args":{"path":"/user/name","token":"jd"}}
     // -------------------------------------------------------------------------
     e.reg(
-        { "get_global_json", "Get global JSON (entire or by path)",
-          { {"path", "JSON pointer path (optional, e.g., /a/b/c)", false, ""} } },
-        [&e](const json& args) -> Result
+        { "get_global_json", "Get global JSON (requires token)",
+          { {"path", "JSON pointer path (optional, e.g., /a/b/c)", false, ""},
+            {"token", "Security token", false, ""} } },
+        [&e, token](const json& args) -> Result
         {
             try {
+                // Token authentication
+                if (!token.empty()) {
+                    std::string req_token = args.value("token", "");
+                    if (req_token != token) {
+                        return { 6, "", "get_global_json requires valid token" };
+                    }
+                }
+                
                 std::string path = args.value("path", "");
                 
                 json result;

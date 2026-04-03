@@ -90,8 +90,8 @@
 <script>
 const API = '';   // 同源，无需前缀
 
-// Token storage for call_shell command
-let shellToken = sessionStorage.getItem('shell_token') || '';
+// Token storage for authenticated commands
+let authToken = sessionStorage.getItem('auth_token') || '';
 
 // Curl OS preference (default: linux)
 let curlOS = localStorage.getItem('curl_os') || 'linux';
@@ -266,19 +266,24 @@ async function runCmd() {
     catch { box.className = 'result-box err'; box.textContent = 'invalid JSON in args'; return; }
   }
 
-  // For call_shell command, check if token is needed
+  // For commands that require token authentication
+  const requiresToken = ['call_shell', 'get_global_json', 'set_global_json'];
   let body = { cmd, args };
-  if (cmd === 'call_shell') {
-    if (!shellToken) {
-      shellToken = prompt('call_shell requires authentication. Please enter token:');
-      if (!shellToken) {
+  
+  if (requiresToken.includes(cmd)) {
+    if (!authToken) {
+      authToken = prompt(`${cmd} requires authentication. Please enter token (default: jd):`);
+      if (!authToken) {
         box.className = 'result-box err';
-        box.textContent = 'Token required for call_shell command';
+        box.textContent = `Token required for ${cmd} command`;
         return;
       }
-      sessionStorage.setItem('shell_token', shellToken);
+      sessionStorage.setItem('auth_token', authToken);
     }
-    body.token = shellToken;
+    // Add token to args
+    if (!args) args = {};
+    args.token = authToken;
+    body.args = args;
   }
 
   try {
@@ -294,9 +299,9 @@ async function runCmd() {
     box.className = 'result-box' + (isSuccess ? '' : ' err');
     
     // If authentication error (code 6), clear cached token
-    if (data.code === 6 && cmd === 'call_shell') {
-      shellToken = '';
-      sessionStorage.removeItem('shell_token');
+    if (data.code === 6 && requiresToken.includes(cmd)) {
+      authToken = '';
+      sessionStorage.removeItem('auth_token');
       box.textContent = 'Authentication failed. Token cleared.\n\n' + JSON.stringify(data, null, 2);
     } else {
       box.textContent = JSON.stringify(data, null, 2);
