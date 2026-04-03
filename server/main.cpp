@@ -17,6 +17,14 @@
 #include <sstream>
 #include <atomic>
 #include <thread>
+#include <filesystem>
+#include <csignal>
+#ifdef _WIN32
+#include <process.h>
+#define getpid _getpid
+#else
+#include <unistd.h>
+#endif
 #include "../third_party/httplib.h"
 #include "../core/engine.h"
 #include "../core/commands.h"
@@ -32,6 +40,24 @@ static constexpr int    KEEP_ALIVE_TIMEOUT = 10;          // seconds
 static constexpr int    READ_TIMEOUT       = 10;          // seconds
 static constexpr int    WRITE_TIMEOUT      = 10;          // seconds
 static constexpr int    DEFAULT_TIMEOUT_MS = 30000;       // per-command default
+
+// ---------------------------------------------------------------------------
+// Signal handler for cleanup
+// ---------------------------------------------------------------------------
+static void cleanup_server_info()
+{
+    try {
+        std::filesystem::remove("data/srv_argc_argv.txt");
+    } catch (...) {
+        // Ignore errors during cleanup
+    }
+}
+
+static void signal_handler(int signum)
+{
+    cleanup_server_info();
+    std::exit(signum);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -433,6 +459,10 @@ static httplib::Server* make_server(size_t threads)
 // ---------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {
+    // Register signal handlers for cleanup
+    std::signal(SIGINT, signal_handler);   // Ctrl+C
+    std::signal(SIGTERM, signal_handler);  // kill command
+    
     int         port        = DEFAULT_PORT;
     int         port_https  = 0;              // 0 = HTTPS disabled
     size_t      threads     = THREAD_POOL_SIZE;
@@ -673,6 +703,28 @@ int main(int argc, char* argv[])
 
     logger.log("Server ready - accepting connections");
     
+    // Write server startup info to file for CLI token sync
+    try {
+        std::filesystem::create_directories("data");
+        std::ofstream srv_info("data/srv_argc_argv.txt");
+        if (srv_info.is_open()) {
+            // Write PID for verification
+            srv_info << "PID=" << getpid() << "\n";
+            // Write token
+            srv_info << "TOKEN=" << token << "\n";
+            // Write command line
+            srv_info << "CMDLINE=";
+            for (int i = 0; i < argc; ++i) {
+                if (i > 0) srv_info << " ";
+                srv_info << argv[i];
+            }
+            srv_info << "\n";
+            srv_info.close();
+        }
+    } catch (...) {
+        // Ignore errors - this is not critical
+    }
+    
     std::cout << "=== cpp_srv started ===\n"
               << "  IPv4 (HTTP)  : http://0.0.0.0:"     << port << "\n";
     if (svr6)
@@ -703,6 +755,10 @@ int main(int argc, char* argv[])
 #endif
 
     logger.log("Server shutting down");
+    
+    // Clean up server info file
+    cleanup_server_info();
+    
     delete svr4;
     if (svr6) delete svr6;
 #ifdef CPPHTTPLIB_OPENSSL_SUPPORT

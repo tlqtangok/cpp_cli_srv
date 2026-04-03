@@ -6,15 +6,83 @@
 //   cpp_cli --cmd echo --args "{\"text\":\"hi\"}" --human
 //
 #include <iostream>
+#include <fstream>
 #include <string>
+#include <filesystem>
+#ifdef _WIN32
+#include <windows.h>
+#include <tlhelp32.h>
+#else
+#include <unistd.h>
+#include <signal.h>
+#endif
 #include "../core/engine.h"
 #include "../core/commands.h"
+
+// Check if a process is running (cross-platform)
+bool is_process_running(int pid)
+{
+#ifdef _WIN32
+    HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (hProcess == NULL) return false;
+    DWORD exitCode;
+    bool running = GetExitCodeProcess(hProcess, &exitCode) && exitCode == STILL_ACTIVE;
+    CloseHandle(hProcess);
+    return running;
+#else
+    // On Unix, kill(pid, 0) checks if process exists without sending a signal
+    return kill(pid, 0) == 0;
+#endif
+}
+
+// Read server token from data/srv_argc_argv.txt if server is running
+std::string get_server_token()
+{
+    const std::string srv_file = "data/srv_argc_argv.txt";
+    
+    // Check if file exists
+    if (!std::filesystem::exists(srv_file)) {
+        return "jd";  // Default token if no server info
+    }
+    
+    try {
+        std::ifstream file(srv_file);
+        if (!file.is_open()) {
+            return "jd";
+        }
+        
+        int pid = -1;
+        std::string token = "jd";
+        std::string line;
+        
+        while (std::getline(file, line)) {
+            if (line.substr(0, 4) == "PID=") {
+                pid = std::stoi(line.substr(4));
+            } else if (line.substr(0, 6) == "TOKEN=") {
+                token = line.substr(6);
+            }
+        }
+        file.close();
+        
+        // Verify the server process is still running
+        if (pid > 0 && is_process_running(pid)) {
+            return token;  // Use server's token
+        } else {
+            // Server not running, delete stale file
+            std::filesystem::remove(srv_file);
+            return "jd";  // Use default
+        }
+    } catch (...) {
+        return "jd";  // Default on any error
+    }
+}
 
 int main(int argc, char* argv[])
 {
     Engine e;
-    // Use default token "jd" for CLI mode (same as server default)
-    register_all(e, "jd");
+    // Try to get token from running server, otherwise use default "jd"
+    std::string token = get_server_token();
+    register_all(e, token);
 
     std::string cmd, args_str;
     bool schema_mode = false;
