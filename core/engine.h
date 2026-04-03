@@ -7,6 +7,9 @@
 #include <future>         // std::future / std::async
 #include <chrono>
 #include <optional>
+#include <thread>
+#include <cstdio>
+#include <unistd.h>
 #include "../third_party/json.hpp"
 
 using json = nlohmann::json;
@@ -209,14 +212,14 @@ public:
         }
     }
     
-    // Set entire global JSON
+    // Set entire global JSON (deferred persistence)
     void set_global_json(const json& new_val)
     {
         {
             std::unique_lock<std::shared_mutex> lock(global_json_mutex_);
             global_json_ = new_val;
         }
-        save_global_json();
+        schedule_save_global_json();
     }
     
     // Apply merge patch (RFC 7386) and return JSON Patch diff (RFC 6902)
@@ -229,7 +232,7 @@ public:
             global_json_.merge_patch(patch);
             after = global_json_;
         }
-        save_global_json();
+        schedule_save_global_json();
         
         // Generate JSON Patch (RFC 6902) diff
         json diff = json::diff(before, after);
@@ -252,6 +255,68 @@ public:
         } catch (...) {
             // Silently fail - persistence is best-effort
         }
+    }
+    
+    // Get CPU usage percentage (0-100)
+    double get_cpu_usage()
+    {
+        #ifdef _WIN32
+            // Windows: use performance counter (simplified, returns estimate)
+            return 30.0;  // Placeholder for Windows
+        #else
+            // Linux: read /proc/loadavg and estimate CPU usage
+            // loadavg is normalized by number of CPUs
+            FILE* fp = fopen("/proc/loadavg", "r");
+            if (!fp) return 0.0;
+            
+            double load1, load5, load15;
+            int result = fscanf(fp, "%lf %lf %lf", &load1, &load5, &load15);
+            fclose(fp);
+            
+            if (result == 3) {
+                // Get number of CPUs
+                long nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+                if (nprocs <= 0) nprocs = 1;
+                
+                // Estimate CPU usage from 1-minute load average
+                double estimated_cpu = (load1 / nprocs) * 100.0;
+                return std::min(100.0, estimated_cpu);  // Cap at 100%
+            }
+            return 0.0;
+        #endif
+    }
+    
+    // Schedule deferred save: wait 5s then write when CPU < 50%
+    void schedule_save_global_json()
+    {
+        // Cancel previous pending save
+        if (save_task_.valid()) {
+            save_task_.wait();  // Wait for completion
+        }
+        
+        // Schedule new async save task
+        save_task_ = std::async(std::launch::async, [this]() {
+            // Wait 5 seconds
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+            
+            // Wait for CPU to drop below 50%, max 60 seconds total
+            auto start = std::chrono::steady_clock::now();
+            auto timeout = std::chrono::seconds(60);
+            
+            while (std::chrono::steady_clock::now() - start < timeout) {
+                double cpu_usage = get_cpu_usage();
+                if (cpu_usage < 50.0) {
+                    // CPU is spare, safe to write
+                    save_global_json();
+                    return;
+                }
+                // CPU busy, wait 100ms and check again
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+            
+            // Timeout: force write anyway
+            save_global_json();
+        });
     }
     
     // Load global JSON from disk
@@ -291,4 +356,7 @@ private:
     mutable std::shared_mutex                          global_json_mutex_;
     json                                               global_json_;
     std::string                                        global_json_path_ = "data/GLOBAL_JSON.json";
+    
+    // Deferred persistence task
+    std::future<void>                                  save_task_;
 };
