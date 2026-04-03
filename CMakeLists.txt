@@ -65,13 +65,10 @@ else()
     endif()
 endif()
 
-# Copy web assets next to the binary so relative path works
-add_custom_command(TARGET cpp_srv POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_SOURCE_DIR}/web
-        $<TARGET_FILE_DIR:cpp_srv>/web
-    COMMENT "Copying web/ assets alongside binary"
-)
+# Note: web/ directory is used directly from source, not copied to build
+# Server loads web/index.html using relative path from executable directory
+# When running: ./build/cpp_srv, the working directory is the repo root
+# so web/index.html is accessible
 
 # ── CLI binary ─────────────────────────────────────────────────────────────────
 add_executable(cpp_cli cli/main.cpp)
