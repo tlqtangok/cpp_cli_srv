@@ -46,6 +46,8 @@ static constexpr int    DEFAULT_TIMEOUT_MS = 30000;       // per-command default
 // ---------------------------------------------------------------------------
 // Signal handler for cleanup
 // ---------------------------------------------------------------------------
+static Engine* g_engine_ptr = nullptr;  // Global pointer for signal handler
+
 static void cleanup_server_info()
 {
     try {
@@ -57,6 +59,15 @@ static void cleanup_server_info()
 
 static void signal_handler(int signum)
 {
+    // Save global JSON before exit (prevents data loss on Ctrl+C)
+    if (g_engine_ptr) {
+        try {
+            g_engine_ptr->save_global_json();
+        } catch (...) {
+            // Ignore errors during shutdown
+        }
+    }
+    
     cleanup_server_info();
     std::exit(signum);
 }
@@ -544,6 +555,7 @@ int main(int argc, char* argv[])
         threads = std::max(1u, std::thread::hardware_concurrency());
 
     Engine           e;
+    g_engine_ptr = &e;  // Set global pointer for signal handler
     std::atomic<int> active{0};
     Logger           logger(logfile);
     register_all(e, token);  // Pass token to register commands

@@ -401,6 +401,10 @@ The system provides a **global JSON variable** that persists in memory (server) 
   - **Multiple rapid edits** (e.g., 10 edits in 10 seconds) trigger only **one** final disk write
   - **Non-blocking**: Rapid edits never hang the server (atomic flag-based synchronization)
   - Rationale: Reduces I/O load during intensive write periods, improves performance
+- **Graceful shutdown**: SIGINT (Ctrl+C) and SIGTERM automatically save global JSON before exit
+  - Prevents data loss on server shutdown
+  - Pending in-memory changes are flushed to disk
+  - Safe to stop server at any time without losing data
 - Survives server restarts
 
 ### CLI Behavior
