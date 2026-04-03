@@ -79,7 +79,7 @@ std::string get_server_token()
 
 int main(int argc, char* argv[])
 {
-    Engine e;
+    Engine e(true);  // true = immediate persist mode for CLI
     // Try to get token from running server, otherwise use default "jd"
     std::string token = get_server_token();
     register_all(e, token);

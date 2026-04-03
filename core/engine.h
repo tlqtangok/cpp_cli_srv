@@ -9,6 +9,7 @@
 #include <optional>
 #include <thread>
 #include <cstdio>
+#include <atomic>         // std::atomic for thread-safe flags
 #ifdef _WIN32
     #include <windows.h>
 #else
@@ -105,7 +106,10 @@ class Engine
 {
 public:
     // Constructor - load global JSON on startup
-    Engine()
+    // immediate_persist: if true (CLI mode), write to disk immediately after edits
+    //                   if false (server mode), use deferred persistence with 15min delay
+    Engine(bool immediate_persist = false) 
+        : immediate_persist_(immediate_persist)
     {
         load_global_json();
     }
@@ -223,7 +227,12 @@ public:
             std::unique_lock<std::shared_mutex> lock(global_json_mutex_);
             global_json_ = new_val;
         }
-        schedule_save_global_json();
+        
+        if (immediate_persist_) {
+            save_global_json();  // CLI mode: write immediately
+        } else {
+            schedule_save_global_json();  // Server mode: deferred write
+        }
     }
     
     // Apply merge patch (RFC 7386) and return JSON Patch diff (RFC 6902)
@@ -236,11 +245,14 @@ public:
             global_json_.merge_patch(patch);
             after = global_json_;
         }
-        schedule_save_global_json();
         
-        // Generate JSON Patch (RFC 6902) diff
-        json diff = json::diff(before, after);
-        return diff;
+        if (immediate_persist_) {
+            save_global_json();  // CLI mode: write immediately
+        } else {
+            schedule_save_global_json();  // Server mode: deferred write
+        }
+        
+        return json::diff(before, after);
     }
     
     // Save global JSON to disk
@@ -298,38 +310,60 @@ public:
     }
     
     // Schedule deferred save: wait 15min then write when CPU < 50%
-    // Longer delay allows intensive write operations to batch together
+    // Non-blocking: multiple rapid edits only trigger ONE final disk write
     void schedule_save_global_json()
     {
-        // Cancel previous pending save
-        if (save_task_.valid()) {
-            save_task_.wait();  // Wait for completion
+        // Signal that a save is needed
+        save_pending_.store(true, std::memory_order_release);
+        
+        // If a save task is already running, it will see the flag and continue
+        // Don't block waiting for it - let it handle the new edits
+        if (save_task_running_.load(std::memory_order_acquire)) {
+            return;  // Task already running, it will handle this edit
         }
         
-        // Schedule new async save task
-        save_task_ = std::async(std::launch::async, [this]() {
-            // Wait 15 minutes (900 seconds) before attempting disk write
-            // This batches multiple edits into a single I/O operation
-            std::this_thread::sleep_for(std::chrono::seconds(900));
-            
-            // Wait for CPU to drop below 50%, max 20 minutes total wait
-            auto start = std::chrono::steady_clock::now();
-            auto timeout = std::chrono::seconds(1200);  // 20 minutes max
-            
-            while (std::chrono::steady_clock::now() - start < timeout) {
-                double cpu_usage = get_cpu_usage();
-                if (cpu_usage < 50.0) {
-                    // CPU is spare, safe to write
+        // No task running, start a new one
+        save_task_running_.store(true, std::memory_order_release);
+        
+        // Detach the task so it runs independently without blocking
+        std::thread([this]() {
+            while (true) {
+                // Wait 15 minutes (900 seconds) before attempting disk write
+                std::this_thread::sleep_for(std::chrono::seconds(900));
+                
+                // Check if more edits came in during the delay
+                if (save_pending_.load(std::memory_order_acquire)) {
+                    save_pending_.store(false, std::memory_order_release);
+                    
+                    // Wait for CPU to drop below 50%, max 20 minutes total wait
+                    auto start = std::chrono::steady_clock::now();
+                    auto timeout = std::chrono::seconds(1200);  // 20 minutes max
+                    
+                    while (std::chrono::steady_clock::now() - start < timeout) {
+                        double cpu_usage = get_cpu_usage();
+                        if (cpu_usage < 50.0) {
+                            break;  // CPU is spare, safe to write
+                        }
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    }
+                    
+                    // Perform the actual disk write
                     save_global_json();
-                    return;
+                    
+                    // Check if more edits came in while we were writing
+                    if (!save_pending_.load(std::memory_order_acquire)) {
+                        // No more pending edits, exit the loop
+                        break;
+                    }
+                    // Loop continues if more edits came in
+                } else {
+                    // No pending save, shouldn't happen but exit gracefully
+                    break;
                 }
-                // CPU busy, wait 100ms and check again
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
             
-            // Timeout: force write anyway (20 min total wait)
-            save_global_json();
-        });
+            save_task_running_.store(false, std::memory_order_release);
+        }).detach();
     }
     
     // Load global JSON from disk
@@ -369,7 +403,9 @@ private:
     mutable std::shared_mutex                          global_json_mutex_;
     json                                               global_json_;
     std::string                                        global_json_path_ = "data/GLOBAL_JSON.json";
+    bool                                               immediate_persist_ = false;  // true for CLI, false for server
     
-    // Deferred persistence task
-    std::future<void>                                  save_task_;
+    // Deferred persistence with atomic flags (non-blocking, server mode only)
+    std::atomic<bool>                                  save_pending_{false};
+    std::atomic<bool>                                  save_task_running_{false};
 };

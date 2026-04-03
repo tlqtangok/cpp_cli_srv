@@ -393,17 +393,20 @@ The system provides a **global JSON variable** that persists in memory (server) 
 ### Server Behavior
 - Loads `data/GLOBAL_JSON.json` on startup
 - Keeps JSON in memory for fast access
-- **Deferred persistence**: Batches writes to disk with 15-minute delay + CPU awareness
-  - Memory updates are immediate (in-process)
-  - Disk writes delayed for 15 minutes to allow multiple edits to batch into a single I/O operation
+- **Deferred persistence**: Non-blocking, batches writes to disk with 15-minute delay + CPU awareness
+  - Memory updates are **immediate** (in-process, sub-millisecond)
+  - Disk writes delayed for 15 minutes to batch multiple edits into a single I/O operation
   - When disk write is ready, checks CPU usage: only writes if CPU < 50%
   - Max 20 minutes total wait before forced write (even if CPU high)
+  - **Multiple rapid edits** (e.g., 10 edits in 10 seconds) trigger only **one** final disk write
+  - **Non-blocking**: Rapid edits never hang the server (atomic flag-based synchronization)
   - Rationale: Reduces I/O load during intensive write periods, improves performance
 - Survives server restarts
 
 ### CLI Behavior
-- Direct file operations on `data/GLOBAL_JSON.json`
-- No in-memory cache (loads/saves per command)
+- **Immediate persistence**: Writes to disk immediately after each modification
+- Loads from `data/GLOBAL_JSON.json` on each command invocation
+- Ensures sequential CLI commands see consistent state
 
 ### HTTP Endpoints
 
