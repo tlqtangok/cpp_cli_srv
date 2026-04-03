@@ -15,7 +15,7 @@
 // Sync  command: e.reg(def, SyncHandler)
 // Async command: e.reg_async(def, AsyncHandler)  <- returns std::future<Result>
 
-inline void register_all(Engine& e)
+inline void register_all(Engine& e, const std::string& token = "")
 {
     // -------------------------------------------------------------------------
     // echo - sync, fast
@@ -340,26 +340,37 @@ inline void register_all(Engine& e)
     );
 
     // -------------------------------------------------------------------------
-    // set_global_json - Replace entire global JSON
+    // set_global_json - Replace entire global JSON (TOKEN REQUIRED)
     //
     // Sets the global JSON variable to a new value.
+    // SECURITY: Requires token authentication.
     //
     // Arguments:
     //   - value: New JSON value (required)
+    //   - token: Security token (required if server has token enabled)
     //
     // Returns:
     //   - Success: {"code":0, "output":"Global JSON updated", "error":""}
-    //   - Error: {"code":1, "output":"", "error":"error message"}
+    //   - Error: {"code":6, "output":"", "error":"authentication error"}
     //
     // Examples:
-    //   {"cmd":"set_global_json","args":{"value":{"key":"value","count":42}}}
+    //   {"cmd":"set_global_json","args":{"value":{"key":"value"},"token":"jd"}}
     // -------------------------------------------------------------------------
     e.reg(
-        { "set_global_json", "Replace entire global JSON",
-          { {"value", "New JSON value", true, json::object({{"example","value"}})} } },
-        [&e](const json& args) -> Result
+        { "set_global_json", "Replace entire global JSON (requires token)",
+          { {"value", "New JSON value", true, json::object({{"example","value"}})},
+            {"token", "Security token", false, ""} } },
+        [&e, token](const json& args) -> Result
         {
             try {
+                // Token authentication (same as call_shell)
+                if (!token.empty()) {
+                    std::string req_token = args.value("token", "");
+                    if (req_token != token) {
+                        return { 6, "", "set_global_json requires valid token" };
+                    }
+                }
+                
                 if (!args.contains("value")) {
                     return { 1, "", "value is required" };
                 }
@@ -376,37 +387,32 @@ inline void register_all(Engine& e)
     // patch_global_json - Apply JSON merge patch (RFC 7386)
     //
     // Applies a merge patch to the global JSON and returns a diff.
-    //
-    // Arguments:
-    //   - patch: JSON merge patch to apply (required)
-    //
-    // Returns:
-    //   - Success: {"code":0, "output":{diff}, "error":""}
-    //     where diff contains: {"before":{...}, "after":{...}, "patch_applied":{...}}
+    // The entire args object is used as the patch (simplified API).
     //
     // Merge Patch Rules (RFC 7386):
     //   - If patch value is object, recursively merge
     //   - If patch value is null, delete the key
     //   - Otherwise, replace the value
     //
+    // Returns:
+    //   - Success: {"code":0, "output":{diff}, "error":""}
+    //     where diff contains: {"before":{...}, "after":{...}, "patch_applied":{...}}
+    //
     // Examples:
     //   Current: {"a":1, "b":{"c":2, "d":3}}
-    //   Patch:   {"b":{"c":999, "e":4}}
+    //   Args:    {"b":{"c":999, "e":4}}
     //   Result:  {"a":1, "b":{"c":999, "d":3, "e":4}}
     //
-    //   {"cmd":"patch_global_json","args":{"patch":{"user":{"name":"Alice","age":30}}}}
+    //   {"cmd":"patch_global_json","args":{"age":31,"city":"NYC"}}
     // -------------------------------------------------------------------------
     e.reg(
         { "patch_global_json", "Apply JSON merge patch and return diff",
-          { {"patch", "JSON merge patch to apply", true, json::object({{"key","value"}})} } },
+          { } },  // No specific args - entire args object is the patch
         [&e](const json& args) -> Result
         {
             try {
-                if (!args.contains("patch")) {
-                    return { 1, "", "patch is required" };
-                }
-                
-                json diff = e.patch_global_json(args["patch"]);
+                // Use the entire args object as the patch
+                json diff = e.patch_global_json(args);
                 return { 0, diff.dump(), "" };
             } catch (const std::exception& ex) {
                 return { 3, "", std::string("exception: ") + ex.what() };

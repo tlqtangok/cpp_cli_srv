@@ -257,10 +257,10 @@ static void mount_routes(httplib::Server& svr,
     });
 
     // -------------------------------------------------------------------------
-    // POST /post/global - Set entire global JSON
-    // Body: { "value": {...} }
+    // POST /post/global - Set entire global JSON (TOKEN REQUIRED)
+    // Body: { "value": {...}, "token": "..." }
     // -------------------------------------------------------------------------
-    svr.Post("/post/global", [&e, &logger](const httplib::Request& req, httplib::Response& res)
+    svr.Post("/post/global", [&e, &logger, &token](const httplib::Request& req, httplib::Response& res)
     {
         std::string client_ip = get_client_ip(req);
         std::string resp_body;
@@ -268,6 +268,20 @@ static void mount_routes(httplib::Server& svr,
         
         try {
             auto body = json::parse(req.body);
+            
+            // Token authentication (same as call_shell)
+            if (!token.empty()) {
+                std::string req_token = body.value("token", "");
+                if (req_token != token) {
+                    json err = { {"code", 6}, {"output", ""}, {"error", "set_global_json requires valid token"} };
+                    resp_body = err.dump();
+                    status = 403;
+                    json_resp(res, err, status);
+                    logger.log_request("POST", "/post/global", client_ip, req.body, status, resp_body);
+                    return;
+                }
+            }
+            
             if (!body.contains("value")) {
                 json err = { {"code", 1}, {"output", ""}, {"error", "value field is required"} };
                 resp_body = err.dump();
@@ -299,7 +313,7 @@ static void mount_routes(httplib::Server& svr,
 
     // -------------------------------------------------------------------------
     // POST /post/global/patch - Apply JSON merge patch
-    // Body: { "patch": {...} }
+    // Body: { "key": "value", ... } - entire body is the patch
     // Returns: { "code": 0, "output": {"before":{...}, "after":{...}, "patch_applied":{...}}, "error": "" }
     // -------------------------------------------------------------------------
     svr.Post("/post/global/patch", [&e, &logger](const httplib::Request& req, httplib::Response& res)
@@ -310,16 +324,9 @@ static void mount_routes(httplib::Server& svr,
         
         try {
             auto body = json::parse(req.body);
-            if (!body.contains("patch")) {
-                json err = { {"code", 1}, {"output", ""}, {"error", "patch field is required"} };
-                resp_body = err.dump();
-                status = 400;
-                json_resp(res, err, status);
-                logger.log_request("POST", "/post/global/patch", client_ip, req.body, status, resp_body);
-                return;
-            }
             
-            json diff = e.patch_global_json(body["patch"]);
+            // Use entire body as patch (simplified API)
+            json diff = e.patch_global_json(body);
             json result = { {"code", 0}, {"output", diff}, {"error", ""} };
             resp_body = result.dump();
             json_resp(res, result);
@@ -431,7 +438,7 @@ int main(int argc, char* argv[])
     size_t      threads     = THREAD_POOL_SIZE;
     bool        no_ipv6     = false;
     std::string logfile     = "";
-    std::string token       = "";
+    std::string token       = "jd";           // Default token for security
     std::string ssl_dir     = "";             // SSL certificate directory
 
     for (int i = 1; i < argc; ++i)
@@ -522,7 +529,7 @@ int main(int argc, char* argv[])
     Engine           e;
     std::atomic<int> active{0};
     Logger           logger(logfile);
-    register_all(e);
+    register_all(e, token);  // Pass token to register commands
     
     logger.log("Server starting...");
 

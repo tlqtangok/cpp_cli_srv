@@ -81,9 +81,9 @@ else
 fi
 TESTS_TOTAL=$((TESTS_TOTAL + 1))
 
-# Test 2: Set global JSON
-echo -n "Test 2: Set global JSON... "
-RESULT=$(./build/cpp_cli --cmd set_global_json --args '{"value":{"name":"Alice","age":30,"config":{"theme":"dark"}}}')
+# Test 2: Set global JSON (with token)
+echo -n "Test 2: Set global JSON with token... "
+RESULT=$(./build/cpp_cli --cmd set_global_json --args '{"value":{"name":"Alice","age":30,"config":{"theme":"dark"}},"token":"jd"}')
 if echo "$RESULT" | jq -e '.code == 0' > /dev/null; then
     echo -e "${GREEN}PASS${NC}"
     TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -131,9 +131,9 @@ else
 fi
 TESTS_TOTAL=$((TESTS_TOTAL + 1))
 
-# Test 6: Apply merge patch
+# Test 6: Apply merge patch (simplified API - no "patch" wrapper)
 echo -n "Test 6: Apply merge patch... "
-RESULT=$(./build/cpp_cli --cmd patch_global_json --args '{"patch":{"age":31,"city":"NYC","config":{"theme":"light","lang":"en"}}}')
+RESULT=$(./build/cpp_cli --cmd patch_global_json --args '{"age":31,"city":"NYC","config":{"theme":"light","lang":"en"}}')
 if echo "$RESULT" | jq -e '.code == 0 and .output.after.age == 31 and .output.after.city == "NYC"' > /dev/null; then
     echo -e "${GREEN}PASS${NC}"
     TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -177,9 +177,9 @@ else
 fi
 TESTS_TOTAL=$((TESTS_TOTAL + 1))
 
-# Test 10: Delete key with null patch
+# Test 10: Delete key with null patch (simplified API)
 echo -n "Test 10: Delete key with null patch... "
-RESULT=$(./build/cpp_cli --cmd patch_global_json --args '{"patch":{"city":null}}')
+RESULT=$(./build/cpp_cli --cmd patch_global_json --args '{"city":null}')
 if echo "$RESULT" | jq -e '.code == 0' > /dev/null; then
     RESULT2=$(./build/cpp_cli --cmd get_global_json --args '{}')
     if echo "$RESULT2" | jq -e '.output | has("city") | not' > /dev/null; then
@@ -237,11 +237,11 @@ else
 fi
 TESTS_TOTAL=$((TESTS_TOTAL + 1))
 
-# Test 13: HTTP POST /post/global (replace)
-echo -n "Test 13: HTTP POST /post/global... "
+# Test 13: HTTP POST /post/global (replace) - now requires token
+echo -n "Test 13: HTTP POST /post/global with token... "
 RESULT=$(curl -s -X POST http://localhost:9999/post/global \
     -H "Content-Type: application/json" \
-    -d '{"value":{"product":"Widget","price":99.99,"stock":100}}')
+    -d '{"value":{"product":"Widget","price":99.99,"stock":100},"token":"jd"}')
 if echo "$RESULT" | jq -e '.code == 0' > /dev/null; then
     echo -e "${GREEN}PASS${NC}"
     TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -263,11 +263,11 @@ else
 fi
 TESTS_TOTAL=$((TESTS_TOTAL + 1))
 
-# Test 15: HTTP POST /post/global/patch
+# Test 15: HTTP POST /post/global/patch (simplified API)
 echo -n "Test 15: HTTP POST /post/global/patch... "
 RESULT=$(curl -s -X POST http://localhost:9999/post/global/patch \
     -H "Content-Type: application/json" \
-    -d '{"patch":{"stock":95,"on_sale":true}}')
+    -d '{"stock":95,"on_sale":true}')
 if echo "$RESULT" | jq -e '.code == 0 and .output.after.stock == 95 and .output.after.on_sale == true' > /dev/null; then
     echo -e "${GREEN}PASS${NC}"
     TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -323,6 +323,20 @@ TESTS_TOTAL=$((TESTS_TOTAL + 1))
 echo -n "Test 19: Error handling - invalid path... "
 RESULT=$(curl -s "http://localhost:9999/get/global/path?path=/nonexistent/path")
 if echo "$RESULT" | jq -e '.code == 1' > /dev/null; then
+    echo -e "${GREEN}PASS${NC}"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+    echo -e "${RED}FAIL${NC}"
+    echo "Got: $RESULT"
+fi
+TESTS_TOTAL=$((TESTS_TOTAL + 1))
+
+# Test 20: Security - set without token should fail
+echo -n "Test 20: Security - set without token fails... "
+RESULT=$(curl -s -X POST http://localhost:9999/post/global \
+    -H "Content-Type: application/json" \
+    -d '{"value":{"test":"no_token"}}')
+if echo "$RESULT" | jq -e '.code == 6' > /dev/null; then
     echo -e "${GREEN}PASS${NC}"
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else
