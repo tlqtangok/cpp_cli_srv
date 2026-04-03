@@ -219,7 +219,7 @@ public:
         save_global_json();
     }
     
-    // Apply merge patch (RFC 7386) and return diff
+    // Apply merge patch (RFC 7386) and return JSON Patch diff (RFC 6902)
     json patch_global_json(const json& patch)
     {
         json before, after;
@@ -231,11 +231,8 @@ public:
         }
         save_global_json();
         
-        // Generate diff (simple before/after comparison)
-        json diff;
-        diff["before"] = before;
-        diff["after"] = after;
-        diff["patch_applied"] = patch;
+        // Generate JSON Patch (RFC 6902) diff
+        json diff = json::diff(before, after);
         return diff;
     }
     

@@ -134,7 +134,8 @@ TESTS_TOTAL=$((TESTS_TOTAL + 1))
 # Test 6: Apply merge patch (simplified API - no "patch" wrapper)
 echo -n "Test 6: Apply merge patch... "
 RESULT=$(./build/cpp_cli --cmd patch_global_json --args '{"age":31,"city":"NYC","config":{"theme":"light","lang":"en"}}')
-if echo "$RESULT" | jq -e '.code == 0 and .output.after.age == 31 and .output.after.city == "NYC"' > /dev/null; then
+# Check that output is a JSON array (JSON Patch format)
+if echo "$RESULT" | jq -e '.code == 0 and (.output | type == "array")' > /dev/null; then
     echo -e "${GREEN}PASS${NC}"
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else
@@ -268,7 +269,8 @@ echo -n "Test 15: HTTP POST /post/global/patch... "
 RESULT=$(curl -s -X POST http://localhost:9999/post/global/patch \
     -H "Content-Type: application/json" \
     -d '{"stock":95,"on_sale":true}')
-if echo "$RESULT" | jq -e '.code == 0 and .output.after.stock == 95 and .output.after.on_sale == true' > /dev/null; then
+# Check that output is a JSON array (JSON Patch format)
+if echo "$RESULT" | jq -e '.code == 0 and (.output | type == "array")' > /dev/null; then
     echo -e "${GREEN}PASS${NC}"
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else

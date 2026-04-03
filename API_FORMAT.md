@@ -320,46 +320,28 @@ curl -X POST http://localhost:8080/post/global \
 ---
 
 ### POST /post/global/patch
-Apply a JSON merge patch (RFC 7386) to the global JSON.
+Apply a JSON merge patch (RFC 7386) to the global JSON and get JSON Patch diff (RFC 6902).
 
-**Request Body**:
+**Request Body** (entire body is the patch):
 ```json
 {
-  "patch": {
-    "age": 31,
-    "city": "NYC",
-    "config": {
-      "theme": "light"
-    }
+  "age": 31,
+  "city": "NYC",
+  "config": {
+    "theme": "light"
   }
 }
 ```
 
-**Response** (includes diff):
+**Response** (JSON Patch diff):
 ```json
 {
   "code": 0,
-  "output": {
-    "before": {
-      "name": "Alice",
-      "age": 30
-    },
-    "after": {
-      "name": "Alice",
-      "age": 31,
-      "city": "NYC",
-      "config": {
-        "theme": "light"
-      }
-    },
-    "patch_applied": {
-      "age": 31,
-      "city": "NYC",
-      "config": {
-        "theme": "light"
-      }
-    }
-  },
+  "output": [
+    {"op": "replace", "path": "/age", "value": 31},
+    {"op": "add", "path": "/city", "value": "NYC"},
+    {"op": "add", "path": "/config", "value": {"theme": "light"}}
+  ],
   "error": ""
 }
 ```
@@ -446,21 +428,20 @@ Replace the entire global JSON.
 ---
 
 ### patch_global_json
-Apply a merge patch and get the diff.
+Apply a merge patch and get the JSON Patch diff (RFC 6902).
 
 ```bash
-./cpp_cli --cmd patch_global_json --args '{"patch":{"age":31,"city":"NYC"}}'
+./cpp_cli --cmd patch_global_json --args '{"age":31,"city":"NYC"}'
 ```
 
-**Response includes before/after diff**:
+**Response includes JSON Patch diff**:
 ```json
 {
   "code": 0,
-  "output": {
-    "before": {"name":"Alice","age":30},
-    "after": {"name":"Alice","age":31,"city":"NYC"},
-    "patch_applied": {"age":31,"city":"NYC"}
-  },
+  "output": [
+    {"op": "replace", "path": "/age", "value": 31},
+    {"op": "add", "path": "/city", "value": "NYC"}
+  ],
   "error": ""
 }
 ```

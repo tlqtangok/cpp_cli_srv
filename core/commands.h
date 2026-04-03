@@ -386,7 +386,7 @@ inline void register_all(Engine& e, const std::string& token = "")
     // -------------------------------------------------------------------------
     // patch_global_json - Apply JSON merge patch (RFC 7386)
     //
-    // Applies a merge patch to the global JSON and returns a diff.
+    // Applies a merge patch to the global JSON and returns a JSON Patch diff (RFC 6902).
     // The entire args object is used as the patch (simplified API).
     //
     // Merge Patch Rules (RFC 7386):
@@ -395,13 +395,14 @@ inline void register_all(Engine& e, const std::string& token = "")
     //   - Otherwise, replace the value
     //
     // Returns:
-    //   - Success: {"code":0, "output":{diff}, "error":""}
-    //     where diff contains: {"before":{...}, "after":{...}, "patch_applied":{...}}
+    //   - Success: {"code":0, "output":[...], "error":""}
+    //     where output is a JSON Patch (RFC 6902) array of operations:
+    //     [{"op":"replace","path":"/key","value":"new"}, {"op":"add","path":"/new","value":123}]
     //
     // Examples:
-    //   Current: {"a":1, "b":{"c":2, "d":3}}
-    //   Args:    {"b":{"c":999, "e":4}}
-    //   Result:  {"a":1, "b":{"c":999, "d":3, "e":4}}
+    //   Current: {"a":1, "b":{"c":2}}
+    //   Args:    {"b":{"c":999}, "d":4}
+    //   Diff:    [{"op":"replace","path":"/b/c","value":999}, {"op":"add","path":"/d","value":4}]
     //
     //   {"cmd":"patch_global_json","args":{"age":31,"city":"NYC"}}
     // -------------------------------------------------------------------------
