@@ -63,7 +63,7 @@
       <input type="text" id="cmdInput" placeholder="e.g. echo" oninput="updateCurl()" />
     </div>
     <div>
-      <label>Args (JSON) <span style="color:#718096;font-size:.75rem">(token auto-filled for authenticated commands)</span></label>
+      <label>Args (JSON) <span style="color:#718096;font-size:.75rem">(must provide valid "token" for authenticated commands)</span></label>
       <textarea id="argsInput" rows="8" placeholder='{"text": "hello"}' oninput="updateCurl()"></textarea>
     </div>
     <div>
@@ -90,22 +90,8 @@
 <script>
 const API = '';   // 同源，无需前缀
 
-// Server token for authenticated commands
-let serverToken = '';
-
 // Curl OS preference (default: linux)
 let curlOS = localStorage.getItem('curl_os') || 'linux';
-
-// Fetch server token on load
-async function loadToken() {
-  try {
-    const r = await fetch(API + '/get/token');
-    const data = await r.json();
-    serverToken = data.token || '';
-  } catch(e) {
-    console.error('Failed to load token:', e);
-  }
-}
 
 async function loadSchema() {
   try {
@@ -132,15 +118,9 @@ async function loadSchema() {
 function fillCmd(c) {
   document.getElementById('cmdInput').value = c.name;
   const sample = {};
-  const authenticatedCommands = ['call_shell', 'get_global_json', 'set_global_json', 'patch_global_json'];
   
   c.args.forEach(a => {
-    // Special handling for token parameter
-    if (a.name === 'token' && authenticatedCommands.includes(c.name)) {
-      sample[a.name] = '<auto-filled>';
-    } else {
-      sample[a.name] = ('default' in a) ? a.default : (a.required ? `<${a.name}>` : '');
-    }
+    sample[a.name] = ('default' in a) ? a.default : (a.required ? `<${a.name}>` : '');
   });
   document.getElementById('argsInput').value = JSON.stringify(sample, null, 2);
   document.querySelectorAll('.cmd-btn').forEach(b => b.classList.toggle('active', b.textContent === c.name));
@@ -284,18 +264,8 @@ async function runCmd() {
     catch { box.className = 'result-box err'; box.textContent = 'invalid JSON in args'; return; }
   }
 
-  // Inject token for authenticated commands
-  const authenticatedCommands = ['call_shell', 'get_global_json', 'set_global_json', 'patch_global_json'];
-  if (authenticatedCommands.includes(cmd)) {
-    if (!serverToken) {
-      box.className = 'result-box err';
-      box.textContent = 'Error: Server token not loaded. Please refresh the page.';
-      return;
-    }
-    // Always override token with server token (ignore user input)
-    args.token = serverToken;
-  }
-
+  // User must provide token manually for authenticated commands
+  // No auto-injection for security reasons
   let body = { cmd, args };
 
   try {
@@ -326,8 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('windowsBtn').classList.toggle('active', curlOS === 'windows');
 });
 
-// Load token and schema on page load
-loadToken();
+// Load schema on page load
 loadSchema();
 </script>
 </body>
