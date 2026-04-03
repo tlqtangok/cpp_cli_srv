@@ -84,60 +84,52 @@ int main(int argc, char* argv[])
     std::string token = get_server_token();
     register_all(e, token);
 
-    std::string cmd, args_str;
+    std::string cmd, args_str, data_str;
     bool schema_mode = false;
     bool human_mode  = false;
 
+    // Parse command line arguments
     for (int i = 1; i < argc; ++i)
     {
         std::string a = argv[i];
         if      (a == "--schema")             schema_mode = true;
         else if (a == "--human")              human_mode  = true;
+        // Old format: --cmd <name> --args '{...}'
         else if (a == "--cmd"  && i+1 < argc) cmd         = argv[++i];
         else if (a == "--args" && i+1 < argc) args_str    = argv[++i];
+        // New format: --data '{...}' or -d '{...}'
+        else if ((a == "--data" || a == "-d") && i+1 < argc) data_str    = argv[++i];
         else if (a == "-h" || a == "--help")
         {
             std::cout << "cpp_cli - Command Line Interface\n\n"
-                      << "Usage: cpp_cli --cmd <name> --args '{...}' [--human]\n"
-                      << "       cpp_cli --schema\n"
-                      << "       cpp_cli --help\n\n"
-                      << "Options:\n"
-                      << "  --cmd <name>      Command to execute\n"
-                      << "  --args '{...}'    JSON arguments for the command\n"
-                      << "  --human           Human-friendly output format\n"
-                      << "  --schema          Show all available commands and their schemas\n"
-                      << "  -h, --help        Show this help message\n\n"
-                      << "Available Commands and Examples:\n\n"
+                      << "Usage (curl-style, recommended):\n"
+                      << "  cpp_cli --data '{\"cmd\":\"<name>\",\"args\":{...}}'\n"
+                      << "  cpp_cli -d '{\"cmd\":\"<name>\",\"args\":{...}}'\n\n"
+                      << "Usage (legacy format):\n"
+                      << "  cpp_cli --cmd <name> --args '{...}'\n\n"
+                      << "Other options:\n"
+                      << "  cpp_cli --schema              Show all available commands and their schemas\n"
+                      << "  cpp_cli --human               Human-friendly output format\n"
+                      << "  cpp_cli -h, --help            Show this help message\n\n"
+                      << "Examples (curl-style format - matches curl POST):\n\n"
                       << "  echo - Echo back text\n"
-                      << "    cpp_cli --cmd echo --args '{\"text\":\"hello world\"}'\n\n"
+                      << "    cpp_cli -d '{\"cmd\":\"echo\",\"args\":{\"text\":\"hello world\"}}'\n\n"
                       << "  add - Add two numbers\n"
-                      << "    cpp_cli --cmd add --args '{\"a\":10,\"b\":32}'\n\n"
+                      << "    cpp_cli -d '{\"cmd\":\"add\",\"args\":{\"a\":10,\"b\":32}}'\n\n"
                       << "  upper - Convert text to uppercase\n"
-                      << "    cpp_cli --cmd upper --args '{\"text\":\"hello\"}'\n\n"
-                      << "  slow_task - Simulate slow operation (async)\n"
-                      << "    cpp_cli --cmd slow_task --args '{\"ms\":2000}'\n\n"
+                      << "    cpp_cli -d '{\"cmd\":\"upper\",\"args\":{\"text\":\"hello\"}}'\n\n"
+                      << "  call_shell - Execute shell command (requires token)\n"
 #ifdef _WIN32
-                      << "  call_shell - Execute shell command (requires token)\n"
-                      << "    cpp_cli --cmd call_shell --args '{\"command\":\"where cmd\",\"token\":\"jd\"}'\n"
-                      << "    cpp_cli --cmd call_shell --args '{\"command\":\"echo Hello\",\"token\":\"jd\"}'\n\n"
+                      << "    cpp_cli -d '{\"cmd\":\"call_shell\",\"args\":{\"command\":\"where cmd\",\"token\":\"jd\"}}'\n\n"
 #else
-                      << "  call_shell - Execute shell command (requires token)\n"
-                      << "    cpp_cli --cmd call_shell --args '{\"command\":\"ls -la\",\"token\":\"jd\"}'\n"
-                      << "    cpp_cli --cmd call_shell --args '{\"command\":\"pwd\",\"token\":\"jd\"}'\n\n"
+                      << "    cpp_cli -d '{\"cmd\":\"call_shell\",\"args\":{\"command\":\"ls -la\",\"token\":\"jd\"}}'\n\n"
 #endif
-                      << "  write_json - Write JSON content to file\n"
-                      << "    cpp_cli --cmd write_json --args '{\"path\":\"./data/config.json\",\"json_content\":{\"host\":\"localhost\",\"port\":8080}}'\n\n"
-                      << "  read_json - Read JSON content from file\n"
-                      << "    cpp_cli --cmd read_json --args '{\"path\":\"./data/config.json\"}'\n\n"
                       << "  get_global_json - Get global JSON (requires token)\n"
-                      << "    cpp_cli --cmd get_global_json --args '{\"token\":\"jd\"}'\n"
-                      << "    cpp_cli --cmd get_global_json --args '{\"path\":\"/user/name\",\"token\":\"jd\"}'\n\n"
+                      << "    cpp_cli -d '{\"cmd\":\"get_global_json\",\"args\":{\"token\":\"jd\"}}'\n\n"
                       << "  set_global_json - Replace entire global JSON (requires token)\n"
-                      << "    cpp_cli --cmd set_global_json --args '{\"value\":{\"name\":\"Alice\"},\"token\":\"jd\"}'\n\n"
-                      << "  patch_global_json - Apply JSON merge patch (RFC 7386)\n"
-                      << "    cpp_cli --cmd patch_global_json --args '{\"age\":31,\"city\":\"NYC\"}'\n\n"
-                      << "  persist_global_json - Force save global JSON to disk\n"
-                      << "    cpp_cli --cmd persist_global_json --args '{}'\n\n"
+                      << "    cpp_cli -d '{\"cmd\":\"set_global_json\",\"args\":{\"value\":{\"name\":\"Alice\"},\"token\":\"jd\"}}'\n\n"
+                      << "  patch_global_json - Apply JSON merge patch\n"
+                      << "    cpp_cli -d '{\"cmd\":\"patch_global_json\",\"args\":{\"age\":31,\"city\":\"NYC\"}}'\n\n"
                       << "Output Format:\n"
                       << "  Default (JSON): {\"code\":0,\"output\":\"...\",\"error\":\"\"}\n"
                       << "  With --human:   [OK] result\\n<output>\n\n"
@@ -152,21 +144,53 @@ int main(int argc, char* argv[])
         return 0;
     }
 
-    if (cmd.empty())
+    // Parse data from either new or old format
+    json data;
+    
+    // If new format (--data or -d) is provided
+    if (!data_str.empty())
     {
-        std::cerr << "Usage: cpp_cli --cmd <name> --args '{...}' [--human]\n"
+        try 
+        { 
+            data = json::parse(data_str);
+            if (!data.contains("cmd"))
+            {
+                std::cerr << "{\"code\":1,\"output\":\"\",\"error\":\"missing 'cmd' field in --data JSON\"}\n";
+                return 1;
+            }
+            cmd = data["cmd"];
+            if (data.contains("args"))
+            {
+                args_str = data["args"].dump();
+            }
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr << "{\"code\":1,\"output\":\"\",\"error\":\"invalid JSON in --data: " << e.what() << "\"}\n";
+            return 1;
+        }
+    }
+    // Old format (--cmd and --args)
+    else if (!cmd.empty())
+    {
+        // cmd already set, args_str already set
+    }
+    else
+    {
+        std::cerr << "Usage: cpp_cli -d '{\"cmd\":\"<name>\",\"args\":{...}}'\n"
                   << "       cpp_cli --schema\n"
                   << "       cpp_cli --help\n";
         return 1;
     }
 
+    // Parse arguments
     json args;
     if (!args_str.empty())
     {
         try { args = json::parse(args_str); }
-        catch (...)
+        catch (const std::exception& e)
         {
-            std::cerr << "{\"code\":1,\"output\":\"\",\"error\":\"invalid JSON in --args\"}\n";
+            std::cerr << "{\"code\":1,\"output\":\"\",\"error\":\"invalid JSON in args: " << e.what() << "\"}\n";
             return 1;
         }
     }

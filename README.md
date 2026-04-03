@@ -128,31 +128,57 @@ See [BUILD_STATIC.md](BUILD_STATIC.md) for detailed static build guide.
 
 ## CLI Usage
 
+### Command Format
+
+The CLI supports two formats:
+
+**New Format (curl-style, recommended)** — Same as HTTP POST requests:
+```bash
+./build/cpp_cli -d '{"cmd":"<command>","args":{...}}'
+./build/cpp_cli --data '{"cmd":"<command>","args":{...}}'
+```
+
+**Legacy Format (backward compatible)**:
+```bash
+./build/cpp_cli --cmd <command> --args '{...}'
+```
+
 ### Basic commands:
 
-| Platform | Command | Description |
-|----------|---------|-------------|
-| **Windows** | `build\cpp_cli.exe --help` | Show help message |
-| **Linux** | `./build/cpp_cli --help` | Show help message |
-| **Windows** | `build\cpp_cli.exe --schema` | List all commands |
-| **Linux** | `./build/cpp_cli --schema` | List all commands |
-| **Windows** | `build\cpp_cli.exe --cmd echo --args "{\"text\":\"hello\"}"` | Run command |
-| **Linux** | `./build/cpp_cli --cmd echo --args '{"text":"hello"}'` | Run command |
+| Command | Description |
+|---------|-------------|
+| `./build/cpp_cli --help` | Show help message |
+| `./build/cpp_cli --schema` | List all commands |
+| `./build/cpp_cli -d '{"cmd":"echo","args":{"text":"hello"}}'` | Run command (new format) |
+| `./build/cpp_cli --cmd echo --args '{"text":"hello"}'` | Run command (legacy format) |
 
-### Complete usage examples:
+### Complete usage examples (new curl-style format):
 
 ```bash
-# Windows (PowerShell / CMD)
-build\cpp_cli.exe --help
-build\cpp_cli.exe --schema
-build\cpp_cli.exe --cmd echo  --args "{\"text\":\"hello\"}"
-build\cpp_cli.exe --cmd add   --args "{\"a\":3,\"b\":4}"
-build\cpp_cli.exe --cmd upper --args "{\"text\":\"hello\"}"
-build\cpp_cli.exe --cmd add --args "{\"a\":3,\"b\":4}" --human
+# Basic commands
+./build/cpp_cli -d '{"cmd":"echo","args":{"text":"hello"}}'
+./build/cpp_cli -d '{"cmd":"add","args":{"a":3,"b":4}}'
+./build/cpp_cli -d '{"cmd":"upper","args":{"text":"hello"}}'
 
-# Linux (Bash)
-./build/cpp_cli --help
-./build/cpp_cli --schema
+# With human-friendly output
+./build/cpp_cli -d '{"cmd":"add","args":{"a":3,"b":4}}' --human
+
+# Global JSON operations
+./build/cpp_cli -d '{"cmd":"get_global_json","args":{"token":"jd"}}'
+./build/cpp_cli -d '{"cmd":"set_global_json","args":{"value":{"name":"Alice"},"token":"jd"}}'
+./build/cpp_cli -d '{"cmd":"patch_global_json","args":{"age":31,"city":"NYC"}}'
+
+# Shell commands (requires token)
+./build/cpp_cli -d '{"cmd":"call_shell","args":{"command":"ls -la","token":"jd"}}'
+
+# File I/O
+./build/cpp_cli -d '{"cmd":"read_json","args":{"path":"./data/config.json"}}'
+./build/cpp_cli -d '{"cmd":"write_json","args":{"path":"./data/config.json","json_content":{"host":"localhost","port":8080}}}'
+```
+
+### Legacy format examples (still supported):
+
+```bash
 ./build/cpp_cli --cmd echo --args '{"text":"hello"}'
 ./build/cpp_cli --cmd add --args '{"a":3,"b":4}'
 ./build/cpp_cli --cmd upper --args '{"text":"hello"}'
@@ -163,13 +189,12 @@ build\cpp_cli.exe --cmd add --args "{\"a\":3,\"b\":4}" --human
 
 Default (machine/agent mode):
 ```json
-{"ok":true,"message":"ok","data":{"result":<value>}}
+{"code":0,"output":"result","error":""}
 ```
 
 With `--human`:
 ```
-[OK] ok
-{"result": 7}
+[OK] result
 ```
 
 Exit code is `0` on success, `1` on any error — pipeline-safe.
