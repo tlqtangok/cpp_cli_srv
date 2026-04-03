@@ -108,6 +108,18 @@ function saveToken(token) {
   }
 }
 
+// Generate timestamp in format: %Y%m%d_%H%M%S (e.g., 20260403_091605)
+function getTimestamp() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  return `${year}${month}${day}_${hours}${minutes}${seconds}`;
+}
+
 async function loadSchema() {
   try {
     const r = await fetch(API + '/get/schema');
@@ -137,6 +149,12 @@ function fillCmd(c) {
   c.args.forEach(a => {
     sample[a.name] = ('default' in a) ? a.default : (a.required ? `<${a.name}>` : '');
   });
+  
+  // Special demo for patch_global_json
+  if (c.name === 'patch_global_json') {
+    const timestamp = getTimestamp();
+    sample.patch_key = `val_${timestamp}`;
+  }
   
   // Auto-fill cached token for authenticated commands (debugging convenience)
   if (AUTHENTICATED_COMMANDS.includes(c.name)) {
