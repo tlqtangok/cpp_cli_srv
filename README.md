@@ -906,3 +906,13 @@ tar xzf project.tar.gz
                                            │  Browser GUI     │
                                            └─────────────────┘
 ```
+
+---
+
+## Author & License
+
+**Author**: linqi  
+**Email**: tlqtangok@126.com  
+**Copyright**: 2026
+
+This project is released as open source software. All rights reserved.
