@@ -59,19 +59,18 @@ struct Result
         json result;
         result["code"] = code;
         
-        // Try to parse output as JSON; if successful, embed as object
-        // This makes read_json and similar commands return clean JSON objects
-        if (!output.empty() && (output[0] == '{' || output[0] == '['))
-        {
+        // Try to parse output as JSON for any value type:
+        //   objects {}, arrays [], strings "...", numbers, booleans, null.
+        // This ensures get_global_json returns "val" not "\"val\"",
+        // and returns 4 not "4" when the stored value is a number.
+        // Falls back to plain string when output is arbitrary text (e.g., shell stdout).
+        if (!output.empty()) {
             try {
                 result["output"] = json::parse(output);
             } catch (...) {
-                // If parse fails, keep as string
                 result["output"] = output;
             }
-        }
-        else
-        {
+        } else {
             result["output"] = output;
         }
         
