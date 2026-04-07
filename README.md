@@ -366,6 +366,39 @@ Returns the full command list with argument definitions.
 
 Open `http://localhost:8080` — it reads `/get/schema` on load and auto-builds the command list. Click any command to pre-fill its argument template, then hit **Run**.
 
+#### Command Configuration
+
+The GUI supports configuration-based command enablement/disablement. On startup:
+
+1. **Token Validation**: GUI prompts for token (cached in localStorage for convenience)
+2. **Config Loading**: Fetches `cpp_cli_srv_config` from global JSON using token
+3. **Default Creation**: If config doesn't exist, creates default (all enabled except `set_global_json`)
+4. **Button Disabling**: Commands disabled in config show disabled Run button (grayed out, tooltip explains)
+
+Config example (stored at `/cpp_cli_srv_config` in global JSON):
+```json
+{
+  "echo": true,
+  "call_shell": true,
+  "set_global_json": false,
+  "patch_global_json": true,
+  "write_json": false
+}
+```
+
+To create/modify config via curl:
+```bash
+# Create default config (all enabled except set_global_json)
+curl -k -X POST http://localhost:8080/post/run \
+  -H 'Content-Type: application/json' \
+  -d '{"cmd":"patch_global_json","args":{"cpp_cli_srv_config":{"echo":true,"set_global_json":false,...}}}'
+
+# Fetch config (requires token)
+curl -k -X POST http://localhost:8080/post/run \
+  -H 'Content-Type: application/json' \
+  -d '{"cmd":"get_global_json","args":{"path":"/cpp_cli_srv_config","token":"YOUR_TOKEN"}}'
+```
+
 ---
 
 ## Performance Benchmarks
