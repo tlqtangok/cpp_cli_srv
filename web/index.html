@@ -88,7 +88,11 @@
   </div>
 </div>
 <script>
-const API = '';   // 同源，无需前缀
+// Derive API prefix from the current page path so the GUI works correctly
+// whether served at the root ("/") or behind a ProxyPassReverse sub-path
+// e.g. http://host:port/cpp_cli_srv/ → API = '/cpp_cli_srv'
+//      http://host:port/             → API = ''
+const API = window.location.pathname.replace(/\/[^\/]*$/, '').replace(/\/+$/, '');
 
 // Curl OS preference (default: linux)
 let curlOS = localStorage.getItem('curl_os') || 'linux';
@@ -327,7 +331,7 @@ function updateCurl() {
   }
   
   // Get base URL (window.location.origin gives the current host)
-  const baseUrl = window.location.origin;
+  const baseUrl = window.location.origin + API;
   
   // Determine if HTTPS and add -k flag if needed
   const isHttps = baseUrl.startsWith('https://');
