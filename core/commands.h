@@ -463,7 +463,7 @@ inline void register_all(Engine& e, const std::string& token = "")
     e.reg(
         { "persist_global_json", "Force save global JSON to disk",
           { } },
-        [&e](const json& args) -> Result
+        [&e](const json& /*args*/) -> Result
         {
             try {
                 e.save_global_json();

@@ -27,7 +27,11 @@
 #else
 #include <unistd.h>
 #endif
+// Suppress deprecation warnings from httplib internals (third-party code)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #include "../third_party/httplib.h"
+#pragma GCC diagnostic pop
 #include "../core/engine.h"
 #include "../core/commands.h"
 #include "../core/logger.h"
