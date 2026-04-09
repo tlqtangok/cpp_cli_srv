@@ -4,6 +4,20 @@ project(cpp_cli_srv CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# ── Version info (build time + git commit) ─────────────────────────────────────
+string(TIMESTAMP BUILD_TIME "%Y%m%d%H%M")
+execute_process(
+    COMMAND git rev-parse --short HEAD
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_COMMIT_ID
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+)
+if(NOT GIT_COMMIT_ID)
+    set(GIT_COMMIT_ID "unknown")
+endif()
+message(STATUS "Build version: ${BUILD_TIME}-${GIT_COMMIT_ID}")
+
 # ── Release flags ──────────────────────────────────────────────────────────────
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -69,6 +83,10 @@ endif()
 # Server loads web/index.html using relative path from executable directory
 # When running: ./build/cpp_srv, the working directory is the repo root
 # so web/index.html is accessible
+target_compile_definitions(cpp_srv PRIVATE
+    BUILD_TIME="${BUILD_TIME}"
+    GIT_COMMIT_ID="${GIT_COMMIT_ID}"
+)
 
 # ── CLI binary ─────────────────────────────────────────────────────────────────
 add_executable(cpp_cli cli/main.cpp)
@@ -78,6 +96,11 @@ if(STATIC_BUILD)
 else()
     target_link_libraries(cpp_cli PRIVATE Threads::Threads)
 endif()
+
+target_compile_definitions(cpp_cli PRIVATE
+    BUILD_TIME="${BUILD_TIME}"
+    GIT_COMMIT_ID="${GIT_COMMIT_ID}"
+)
 
 # ── Install (optional) ─────────────────────────────────────────────────────────
 install(TARGETS cpp_srv cpp_cli DESTINATION bin)

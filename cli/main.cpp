@@ -19,6 +19,14 @@
 #include "../core/engine.h"
 #include "../core/commands.h"
 
+#ifndef BUILD_TIME
+#define BUILD_TIME "unknown"
+#endif
+#ifndef GIT_COMMIT_ID
+#define GIT_COMMIT_ID "unknown"
+#endif
+static const std::string VERSION = std::string(BUILD_TIME) + "-" + GIT_COMMIT_ID;
+
 // Check if a process is running (cross-platform)
 bool is_process_running(int pid)
 {
@@ -94,6 +102,11 @@ int main(int argc, char* argv[])
         std::string a = argv[i];
         if      (a == "--schema")             schema_mode = true;
         else if (a == "--human")              human_mode  = true;
+        else if (a == "-v" || a == "--version")
+        {
+            std::cout << "cpp_cli " << VERSION << "\n";
+            return 0;
+        }
         // Old format: --cmd <name> --args '{...}'
         else if (a == "--cmd"  && i+1 < argc) cmd         = argv[++i];
         else if (a == "--args" && i+1 < argc) args_str    = argv[++i];
@@ -110,6 +123,7 @@ int main(int argc, char* argv[])
                       << "Other options:\n"
                       << "  cpp_cli --schema              Show all available commands and their schemas\n"
                       << "  cpp_cli --human               Human-friendly output format\n"
+                      << "  cpp_cli -v, --version         Show version (build time + git commit)\n"
                       << "  cpp_cli -h, --help            Show this help message\n\n"
                       << "Examples (curl-style format - matches curl POST):\n\n"
                       << "  echo - Echo back text\n"

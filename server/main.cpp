@@ -32,6 +32,14 @@
 #include "../core/commands.h"
 #include "../core/logger.h"
 
+#ifndef BUILD_TIME
+#define BUILD_TIME "unknown"
+#endif
+#ifndef GIT_COMMIT_ID
+#define GIT_COMMIT_ID "unknown"
+#endif
+static const std::string VERSION = std::string(BUILD_TIME) + "-" + GIT_COMMIT_ID;
+
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
@@ -479,6 +487,11 @@ int main(int argc, char* argv[])
         else if (flag == "--log"        && i+1 < argc) logfile    = argv[++i];
         else if (flag == "--token"      && i+1 < argc) token      = argv[++i];
         else if (flag == "--ssl"        && i+1 < argc) ssl_dir    = argv[++i];
+        else if (flag == "-v" || flag == "--version")
+        {
+            std::cout << "cpp_srv " << VERSION << "\n";
+            return 0;
+        }
         else if (flag == "-h" || flag == "--help")
         {
             std::cout << "cpp_srv - C++ CLI/HTTP Server\n\n"
@@ -491,6 +504,7 @@ int main(int argc, char* argv[])
                       << "  --no-ipv6             Disable IPv6 server (IPv4 only)\n"
                       << "  --log <file>          Enable logging to file\n"
                       << "  --token <string>      Security token for call_shell command (min 2 chars, alphanumeric + underscore)\n"
+                      << "  -v, --version         Show version (build time + git commit)\n"
                       << "  -h, --help            Show this help message\n\n"
                       << "Examples:\n"
                       << "  cpp_srv\n"
