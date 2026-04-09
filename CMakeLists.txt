@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ── Version info (build time + git commit) ─────────────────────────────────────
-string(TIMESTAMP BUILD_TIME "%Y%m%d%H%M")
+string(TIMESTAMP BUILD_TIME "%Y%m%d")
 execute_process(
     COMMAND git rev-parse --short HEAD
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
