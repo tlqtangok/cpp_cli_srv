@@ -117,24 +117,23 @@ function saveToken(token) {
   }
 }
 
-// Load config from server and initialize command enable/disable status
+// Load config from server and initialize command enable/disable status.
+// Only reads config - never writes to server.
+// If config is absent or unreachable, commandConfig stays {} (all buttons enabled).
 async function loadConfig() {
   let token = getCachedToken();
-  
-  // Get token if not available
+
   if (!token) {
     token = prompt('Please enter token to access the server:');
     if (!token) {
       console.warn('No token provided, GUI will work without config enforcement');
-      // Still initialize GUI without config
       commandConfig = {};
-      return true;
+      return;
     }
     localStorage.setItem(TOKEN_CACHE_KEY, token);
   }
-  
+
   try {
-    // Try to fetch config from /cpp_cli_srv_config
     const r = await fetch(API + '/post/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -143,82 +142,30 @@ async function loadConfig() {
         args: { path: '/cpp_cli_srv_config', token: token }
       })
     });
-    
+
     const data = await r.json();
-    
+
     if (data.code === 0 && data.output && typeof data.output === 'object') {
-      // Config exists, use it
       commandConfig = data.output;
       console.log('Loaded config from server:', commandConfig);
-      return true;
     } else if (data.code === 6) {
-      // Token error - clear it and retry
+      // Token error - clear and retry once
       localStorage.removeItem(TOKEN_CACHE_KEY);
       const newToken = prompt('Invalid or expired token. Please enter token:');
       if (!newToken) {
-        console.warn('Invalid token, GUI will work without config enforcement');
         commandConfig = {};
-        return true;
+        return;
       }
       localStorage.setItem(TOKEN_CACHE_KEY, newToken);
-      // Retry with new token
       return loadConfig();
     } else {
-      // Config doesn't exist, create default
-      console.log('Config not found, creating default...');
-      return createDefaultConfig(token);
+      // Config key not found - all buttons stay enabled
+      console.log('No cpp_cli_srv_config found, all commands enabled');
+      commandConfig = {};
     }
   } catch (e) {
-    console.error('Error loading config:', e);
-    // Network error or config not found - create default
-    return createDefaultConfig(token);
-  }
-}
-
-// Create default config (all commands enabled except set_global_json)
-async function createDefaultConfig(token) {
-  if (!token) {
-    console.warn('No token available, using empty config');
+    console.warn('Could not reach server for config, all commands enabled:', e);
     commandConfig = {};
-    return true;
-  }
-  
-  try {
-    // First get schema to know all available commands
-    const schemaR = await fetch(API + '/get/schema');
-    const commands = await schemaR.json();
-    
-    // Create config with all commands enabled except set_global_json (disabled for safety)
-    const defaultConfig = {};
-    commands.forEach(c => {
-      defaultConfig[c.name] = (c.name !== 'set_global_json');
-    });
-    
-    commandConfig = defaultConfig;
-    
-    // Save config to server using patch_global_json (no token required)
-    const r = await fetch(API + '/post/run', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cmd: 'patch_global_json',
-        args: { cpp_cli_srv_config: defaultConfig }
-      })
-    });
-    
-    const data = await r.json();
-    if (data.code === 0) {
-      console.log('Default config created and saved:', defaultConfig);
-      return true;
-    } else {
-      console.warn('Failed to save config:', data.error);
-      // Still allow GUI to work with client-side config
-      return true;
-    }
-  } catch (e) {
-    console.error('Error creating default config:', e);
-    // Allow GUI to work anyway - will load schema normally
-    return true;
   }
 }
 
@@ -257,13 +204,7 @@ async function loadSchema() {
 }
 
 async function initializeGUI() {
-  // Load config first before showing GUI
-  const configLoaded = await loadConfig();
-  if (!configLoaded) {
-    console.error('Failed to initialize config, but continuing anyway');
-  }
-  
-  // Then load schema
+  await loadConfig();   // read-only: sets commandConfig, never writes to server
   await loadSchema();
 }
 
