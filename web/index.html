@@ -90,9 +90,10 @@
 <script>
 // Derive API prefix from the current page path so the GUI works correctly
 // whether served at the root ("/") or behind a ProxyPassReverse sub-path
-// e.g. http://host:port/cpp_cli_srv/ → API = '/cpp_cli_srv'
+// e.g. http://host:port/cpp_cli_srv  → API = '/cpp_cli_srv'
+//      http://host:port/cpp_cli_srv/ → API = '/cpp_cli_srv'
 //      http://host:port/             → API = ''
-const API = window.location.pathname.replace(/\/[^\/]*$/, '').replace(/\/+$/, '');
+const API = window.location.pathname.replace(/\/+$/, ''); // Remove trailing slashes
 
 // Curl OS preference (default: linux)
 let curlOS = localStorage.getItem('curl_os') || 'linux';

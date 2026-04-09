@@ -35,7 +35,7 @@
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
-static constexpr size_t MAX_BODY_BYTES     = 1024 * 64;  // 64 KB
+static constexpr size_t MAX_BODY_BYTES     = 2*1024 * 1024;  // 2M 
 static constexpr int    DEFAULT_PORT       = 8080;
 static constexpr size_t THREAD_POOL_SIZE   = 0;           // 0 = auto (hw threads)
 static constexpr int    KEEP_ALIVE_TIMEOUT = 10;          // seconds
