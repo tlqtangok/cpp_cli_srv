@@ -115,8 +115,8 @@ Then run:
 ./build/cpp_cli -d '{"cmd":"add","args":{"a":3,"b":4}}' --human
 
 # Global JSON (token required)
-./build/cpp_cli -d '{"cmd":"get_global_json","args":{"token":"jd"}}'
-./build/cpp_cli -d '{"cmd":"patch_global_json","args":{"price":99,"token":"jd"}}'
+./build/cpp_cli -d '{"cmd":"get_global_json","args":{"token":"xxx"}}'
+./build/cpp_cli -d '{"cmd":"patch_global_json","args":{"price":99,"token":"xxx"}}'
 
 # Shell commands (no token required in CLI)
 ./build/cpp_cli -d '{"cmd":"call_shell","args":{"command":"ls -la"}}'
