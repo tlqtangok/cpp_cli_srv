@@ -13,11 +13,11 @@ if "!GIT_COMMIT_ID!"=="" (set GIT_COMMIT_ID=unknown)
 set VERSION_FLAGS=/D "BUILD_TIME=\"!BUILD_TIME!\"" /D "GIT_COMMIT_ID=\"!GIT_COMMIT_ID!\""
 
 echo === Step 1: CLI ===
-cl /std:c++17 /O2 /EHsc /nologo /Icore /Ithird_party %VERSION_FLAGS% cli\main.cpp /Fe:build\cpp_cli.exe 2>&1
+cl /std:c++17 /O2 /EHsc /nologo /W4 /wd4068 /wd4819 /Icore /Ithird_party %VERSION_FLAGS% cli\main.cpp /Fe:build\cpp_cli.exe 2>&1
 echo CLI_ERRORLEVEL=%errorlevel%
 
 echo === Step 2: Server ===
-cl /std:c++17 /O2 /EHsc /nologo /Icore /Ithird_party %VERSION_FLAGS% server\main.cpp /Fe:build\cpp_srv.exe /link ws2_32.lib 2>&1
+cl /std:c++17 /O2 /EHsc /nologo /W4 /wd4068 /wd4819 /Icore /Ithird_party %VERSION_FLAGS% server\main.cpp /Fe:build\cpp_srv.exe /link ws2_32.lib 2>&1
 echo SRV_ERRORLEVEL=%errorlevel%
 
 if exist build\cpp_cli.exe echo CLI_EXE_EXISTS=1

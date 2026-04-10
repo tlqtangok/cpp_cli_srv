@@ -38,12 +38,12 @@ REM Define compile flags with version info
 set VERSION_FLAGS=/D "BUILD_TIME=\"!BUILD_TIME!\"" /D "GIT_COMMIT_ID=\"!GIT_COMMIT_ID!\""
 
 echo [1/2] Building CLI...
-cl /std:c++17 /O2 /EHsc /nologo %STATIC_FLAG% /Icore /Ithird_party %VERSION_FLAGS% cli\main.cpp /Fe:build\%toolname_cli%.exe
+cl /std:c++17 /O2 /EHsc /nologo /W4 /wd4068 /wd4819 %STATIC_FLAG% /Icore /Ithird_party %VERSION_FLAGS% cli\main.cpp /Fe:build\%toolname_cli%.exe
 if %errorlevel% neq 0 ( echo CLI FAILED & exit /b 1 )
 echo CLI OK
 
 echo [2/2] Building Server...
-cl /std:c++17 /O2 /EHsc /nologo %STATIC_FLAG% /Icore /Ithird_party %VERSION_FLAGS% server\main.cpp /Fe:build\%toolname_srv%.exe ws2_32.lib
+cl /std:c++17 /O2 /EHsc /nologo /W4 /wd4068 /wd4819 %STATIC_FLAG% /Icore /Ithird_party %VERSION_FLAGS% server\main.cpp /Fe:build\%toolname_srv%.exe ws2_32.lib
 if %errorlevel% neq 0 ( echo Server FAILED & exit /b 1 )
 echo Server OK
 

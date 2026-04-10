@@ -29,10 +29,15 @@
 #include <unistd.h>
 #endif
 // Suppress deprecation warnings from httplib internals (third-party code)
+// Only use GCC pragmas on GCC/Clang; MSVC will ignore with warning pragma
+#ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
 #include "../third_party/httplib.h"
+#ifdef __GNUC__
 #pragma GCC diagnostic pop
+#endif
 #include "../core/engine.h"
 #include "../core/commands.h"
 #include "../core/logger.h"
