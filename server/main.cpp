@@ -163,19 +163,6 @@ static void mount_routes(httplib::Server& svr,
     });
 
     // -------------------------------------------------------------------------
-    // GET /get/token
-    // Returns server token for Web GUI authentication
-    // Security: Should only be accessible from same origin (CORS protected)
-    // -------------------------------------------------------------------------
-    svr.Get("/get/token", [&logger, &token](const httplib::Request& req, httplib::Response& res)
-    {
-        std::string client_ip = get_client_ip(req);
-        json body = { {"token", token} };
-        json_resp(res, body);
-        logger.log_request("GET", "/get/token", client_ip, "", 200, body.dump());
-    });
-
-    // -------------------------------------------------------------------------
     // POST /post/run
     // Body: { "cmd": "...", "args": {...}, "timeout_ms": 5000 }
     // For authenticated commands, args must include: { "token": "..." }
