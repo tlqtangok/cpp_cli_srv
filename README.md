@@ -517,29 +517,6 @@ The system provides a **global JSON variable** that persists in memory (server) 
 - Loads from `data/GLOBAL_JSON.json` on each command invocation
 - Ensures sequential CLI commands see consistent state
 
-### HTTP Endpoints
-
-```bash
-# Get entire global JSON
-curl http://localhost:8080/get/global
-
-# Get specific path
-curl "http://localhost:8080/get/global/path?path=/user/name"
-
-# Replace entire JSON
-curl -X POST http://localhost:8080/post/global \
-  -H "Content-Type: application/json" \
-  -d '{"value":{"name":"Alice","age":30}}'
-
-# Apply merge patch (returns diff)
-curl -X POST http://localhost:8080/post/global/patch \
-  -H "Content-Type: application/json" \
-  -d '{"patch":{"age":31,"city":"NYC"}}'
-
-# Force save to disk
-curl -X POST http://localhost:8080/post/global/persist
-```
-
 ### CLI Commands
 
 ```bash
@@ -999,16 +976,6 @@ All responses use the unified JSON format: `{"code": 0, "output": "...", "error"
 |----------|--------|-------------|------|
 | `/post/run` | POST | Execute a command (curl-style). Body: `{"cmd":"name","args":{...},"timeout_ms":5000}` | Token (for `call_shell`, `set_global_json`, `patch_global_json` commands) |
 
-### Global JSON Storage
-
-| Endpoint | Method | Description | Auth | Returns |
-|----------|--------|-------------|------|---------|
-| `/get/global` | GET | Get entire global JSON | No | Full object |
-| `/get/global/path` | GET | Get value at JSON pointer path (query param: `?path=/a/b`) | No | Value at path |
-| `/post/global` | POST | Replace entire global JSON. Body: `{"value":{...},"token":"..."}` | Yes (TOKEN) | "updated" message |
-| `/post/global/patch` | POST | Apply RFC 7386 merge patch. Body: `{"patch_key":"value",...}` | No | RFC 6902 diff array |
-| `/post/global/persist` | POST | Force save global JSON to disk | No | "persisted" message |
-
 ### Static Files
 
 | Endpoint | Method | Description |
@@ -1022,35 +989,6 @@ All responses use the unified JSON format: `{"code": 0, "output": "...", "error"
 | `/*` | OPTIONS | CORS preflight (responds 204 No Content) |
 
 ### Request/Response Examples
-
-#### Get entire global JSON
-```bash
-curl http://localhost:8080/get/global
-```
-
-#### Get value at path
-```bash
-curl "http://localhost:8080/get/global/path?path=/user/name"
-```
-
-#### Replace entire global JSON (requires token)
-```bash
-curl -X POST http://localhost:8080/post/global \
-  -H 'Content-Type: application/json' \
-  -d '{"value":{"name":"Alice","age":30},"token":"jd"}'
-```
-
-#### Apply merge patch (no token needed)
-```bash
-curl -X POST http://localhost:8080/post/global/patch \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Bob","age":25}'
-```
-
-#### Force save to disk
-```bash
-curl -X POST http://localhost:8080/post/global/persist
-```
 
 #### Execute command
 ```bash
