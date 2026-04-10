@@ -264,19 +264,30 @@ Open `http://localhost:8080` — auto-builds the command list from `/get/schema`
 
 ## Running Tests
 
-| Test | Windows | Linux |
-|------|---------|-------|
-| CLI smoke tests | `test_cli.bat` | `./test_cli.sh` |
-| Server API tests | `test_server.bat` | `./test_server.sh` |
-| Shell tests | `test_shell.bat` | `./test_shell.sh` |
-| Token auth tests | `test_token.bat` | `./test_token.sh` |
-| JSON I/O tests | `test_json.bat` | `./test_json.sh` |
-| Global JSON tests | `test_global_json.bat` | `./test_global_json.sh` |
-| Concurrency tests | `test_concurrent.bat` | `./test_comprehensive.sh` |
-| IPv6 tests | `test_ipv6.bat` | *(included in test_server.sh)* |
-| Logging tests | — | `./test_logging.sh` |
+See [test/README.md](test/README.md) for a complete test guide.
 
-Start the server in one terminal, then run the test script in another. `test_server.sh` auto-detects the server port from the running process.
+**Quick start:**
+
+```bash
+# Terminal 1: Build and start server
+./build.sh
+./build/cpp_srv --token mytoken123
+
+# Terminal 2: Run all tests
+cd test
+./test_comprehensive.sh       # Linux (auto-detects port)
+test_concurrent.bat           # Windows (stress test)
+```
+
+**Test categories:**
+- CLI smoke tests: `test_cli.{bat,sh}` (no server)
+- API tests: `test_server.{bat,sh}` (HTTP endpoints)
+- Functional: `test_shell.{bat,sh}`, `test_token.{bat,sh}`, `test_json.{bat,sh}`, `test_global_json.{bat,sh}` (with token)
+- Comprehensive: `test_comprehensive.sh` (full suite)
+- Stress: `test_concurrent.bat`, `test_rapid_edits.sh`
+- Performance: `test_req.js` (load testing)
+
+All test scripts auto-detect the server port (Linux) or accept `--port` parameter (Windows).
 
 ---
 
