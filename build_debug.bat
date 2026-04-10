@@ -3,10 +3,9 @@ setlocal enabledelayedexpansion
 call "D:\jd\pro\vs2022\Packages\Community\VC\Auxiliary\Build\vcvars64.bat" 2>nul
 cd /d "c:\Users\tlqta\WorkBuddy\Claw\cpp_cli_srv"
 
-REM Generate version info
-for /f "tokens=2-4 delims=/ " %%a in ('date /t') do (set mydate=%%c%%a%%b)
-for /f "tokens=1-2 delims=/:" %%a in ('time /t') do (set mytime=%%a%%b)
-set BUILD_TIME=!mydate!!mytime!
+REM Generate version info using locale-independent method
+for /f "delims=" %%a in ('powershell -Command "Get-Date -Format 'yyyyMMddHHmm'" 2^>nul') do (set BUILD_TIME=%%a)
+if "!BUILD_TIME!"=="" set BUILD_TIME=unknown
 
 for /f "delims=" %%a in ('git rev-parse --short HEAD 2^>nul') do (set GIT_COMMIT_ID=%%a)
 if "!GIT_COMMIT_ID!"=="" (set GIT_COMMIT_ID=unknown)
