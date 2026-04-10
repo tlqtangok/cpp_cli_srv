@@ -7,14 +7,9 @@ cd /d "%~dp0"
 set ROOT=%CD%
 
 REM Generate version info (BUILD_TIME and GIT_COMMIT_ID)
-REM Use locale-independent method: parse %date% and %time% environment variables
-REM %date% format varies by locale, so use PowerShell for reliability
-for /f "delims=" %%a in ('powershell -Command "Get-Date -Format 'yyyyMMddHHmm'" 2^>nul') do (set BUILD_TIME=%%a)
-if "!BUILD_TIME!"=="" (
-    REM Fallback if PowerShell unavailable: use wmic
-    for /f %%a in ('wmic os get localdatetime ^| findstr .') do (set BUILD_TIME=!BUILD_TIME!%%a)
-    if "!BUILD_TIME!"=="" set BUILD_TIME=unknown
-)
+REM BUILD_TIME format: YYYYMMDD (date only, no time)
+for /f "delims=" %%a in ('powershell -Command "Get-Date -Format 'yyyyMMdd'" 2^>nul') do (set BUILD_TIME=%%a)
+if "!BUILD_TIME!"=="" set BUILD_TIME=unknown
 
 REM Get git commit (short hash)
 for /f "delims=" %%a in ('git rev-parse --short HEAD 2^>nul') do (set GIT_COMMIT_ID=%%a)
