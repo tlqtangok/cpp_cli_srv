@@ -51,6 +51,7 @@
   <span style="font-size:1.4rem">⚡</span>
   <h1>CLI-SRV Web GUI</h1>
   <span class="tag" id="statusTag">connecting...</span>
+  <span class="tag" id="versionTag">v-loading...</span>
 </header>
 <div class="container">
   <div class="sidebar">
@@ -203,9 +204,22 @@ async function loadSchema() {
   }
 }
 
+async function loadVersion() {
+  try {
+    const r = await fetch(API + '/get/version');
+    const data = await r.json();
+    if (data.version) {
+      document.getElementById('versionTag').textContent = 'v-' + data.version;
+    }
+  } catch(e) {
+    document.getElementById('versionTag').textContent = 'v-unknown';
+  }
+}
+
 async function initializeGUI() {
   await loadConfig();   // read-only: sets commandConfig, never writes to server
   await loadSchema();
+  await loadVersion();
 }
 
 function fillCmd(c) {

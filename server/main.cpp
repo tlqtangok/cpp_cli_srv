@@ -1,6 +1,7 @@
 // server/main.cpp
 // API:
 //   GET  /get/schema   -> command list JSON
+//   GET  /get/version  -> build version (timestamp + git commit)
 //   GET  /get/status   -> health check + concurrency info
 //   POST /post/run     -> body: {"cmd":"...", "args":{...}, "timeout_ms": 5000}
 //   GET  /             -> web/index.html
@@ -142,6 +143,18 @@ static void mount_routes(httplib::Server& svr,
         json body = e.schema();
         json_resp(res, body);
         logger.log_request("GET", "/get/schema", client_ip, "", 200, body.dump());
+    });
+
+    // -------------------------------------------------------------------------
+    // GET /get/version
+    // Returns build version (timestamp + git commit)
+    // -------------------------------------------------------------------------
+    svr.Get("/get/version", [&logger](const httplib::Request& req, httplib::Response& res)
+    {
+        std::string client_ip = get_client_ip(req);
+        json body = { {"version", VERSION} };
+        json_resp(res, body);
+        logger.log_request("GET", "/get/version", client_ip, "", 200, body.dump());
     });
 
     // -------------------------------------------------------------------------
