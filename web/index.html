@@ -44,6 +44,29 @@
   .os-btn.active { background: #2b6cb0; border-color: #63b3ed; color: #fff; }
   .os-btn:hover:not(.active) { background: #2d3748; }
   .tag { font-size: .7rem; padding: 2px 7px; border-radius: 10px; background: #2d3748; color: #a0aec0; }
+
+  /* History panel */
+  .history-section { display: none; }
+  .history-section.visible { display: block; }
+  .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .history-header label { margin-bottom: 0; }
+  .clear-history-btn {
+    padding: 3px 10px; background: transparent; border: 1px solid #4a5568; border-radius: 4px;
+    color: #718096; font-size: .7rem; cursor: pointer; transition: all .15s; }
+  .clear-history-btn:hover { background: #742a2a; border-color: #fc8181; color: #fc8181; }
+  .history-list { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
+  .history-item {
+    display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+    background: #1a202c; border: 1px solid #2d3748; border-radius: 6px;
+    cursor: pointer; font-family: 'Consolas', monospace; font-size: .78rem;
+    color: #a0aec0; transition: all .15s; }
+  .history-item:hover { border-color: #63b3ed; color: #e2e8f0; background: #1e2a3a; }
+  .history-item .h-time { color: #4a5568; font-size: .7rem; white-space: nowrap; min-width: 65px; }
+  .history-item .h-args { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .history-item .h-status { font-size: .7rem; min-width: 24px; text-align: center; }
+  .history-item .h-status.ok { color: #68d391; }
+  .history-item .h-status.fail { color: #fc8181; }
+  .history-empty { color: #4a5568; font-size: .78rem; padding: 8px 0; }
 </style>
 </head>
 <body>
@@ -86,6 +109,14 @@
     </div>
     <label>Result</label>
     <div class="result-box" id="result">— waiting —</div>
+    <!-- History panel -->
+    <div class="history-section" id="historySection">
+      <div class="history-header">
+        <label>📜 Recent History (last 10 runs)</label>
+        <button class="clear-history-btn" onclick="clearHistory()">Clear</button>
+      </div>
+      <div class="history-list" id="historyList"></div>
+    </div>
   </div>
 </div>
 <script>
@@ -105,6 +136,11 @@ const TOKEN_CACHE_KEY = 'debug_token';
 const AUTHENTICATED_COMMANDS = ['call_shell', 'get_global_json', 'set_global_json', 'patch_global_json'];
 const CONFIG_CACHE_KEY = 'cli_srv_config';
 
+// History: stored per-command in localStorage
+// Key format: "cmd_history:<command_name>" → JSON array of {time, args, success}
+const HISTORY_PREFIX = 'cmd_history:';
+const MAX_HISTORY = 10;
+
 // Command enable/disable status from server config
 let commandConfig = {};
 
@@ -117,6 +153,83 @@ function saveToken(token) {
     localStorage.setItem(TOKEN_CACHE_KEY, token);
   }
 }
+
+// ---------------------------------------------------------------------------
+// History functions
+// ---------------------------------------------------------------------------
+function getHistory(cmd) {
+  try {
+    const raw = localStorage.getItem(HISTORY_PREFIX + cmd);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveHistory(cmd, args, success) {
+  const list = getHistory(cmd);
+  // Add to front
+  list.unshift({
+    time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+    args: args,
+    success: success
+  });
+  // Trim to max
+  while (list.length > MAX_HISTORY) list.pop();
+  localStorage.setItem(HISTORY_PREFIX + cmd, JSON.stringify(list));
+}
+
+function clearHistory() {
+  const cmd = document.getElementById('cmdInput').value.trim();
+  if (!cmd) return;
+  localStorage.removeItem(HISTORY_PREFIX + cmd);
+  renderHistory(cmd);
+}
+
+function renderHistory(cmd) {
+  const section = document.getElementById('historySection');
+  const list = document.getElementById('historyList');
+  const entries = getHistory(cmd);
+
+  if (!cmd || entries.length === 0) {
+    section.classList.remove('visible');
+    return;
+  }
+
+  section.classList.add('visible');
+  list.innerHTML = '';
+  entries.forEach((entry, idx) => {
+    const div = document.createElement('div');
+    div.className = 'history-item';
+    div.title = JSON.stringify(entry.args, null, 2);
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'h-time';
+    timeSpan.textContent = entry.time;
+
+    const argsSpan = document.createElement('span');
+    argsSpan.className = 'h-args';
+    argsSpan.textContent = JSON.stringify(entry.args);
+
+    const statusSpan = document.createElement('span');
+    statusSpan.className = 'h-status ' + (entry.success ? 'ok' : 'fail');
+    statusSpan.textContent = entry.success ? '✓' : '✗';
+
+    div.appendChild(timeSpan);
+    div.appendChild(argsSpan);
+    div.appendChild(statusSpan);
+
+    div.onclick = () => loadHistoryEntry(entry);
+    list.appendChild(div);
+  });
+}
+
+function loadHistoryEntry(entry) {
+  document.getElementById('argsInput').value = JSON.stringify(entry.args, null, 2);
+  updateCurl();
+}
+
+// ---------------------------------------------------------------------------
+// Config & Schema
+// ---------------------------------------------------------------------------
 
 // Load config from server and initialize command enable/disable status.
 // Only reads config - never writes to server.
@@ -230,12 +343,14 @@ function fillCmd(c) {
     sample[a.name] = ('default' in a) ? a.default : (a.required ? `<${a.name}>` : '');
   });
   
-  // Special demo for patch_global_json
+  // Special demo for patch_global_json: add a sample key-value pair for patching
   if (c.name === 'patch_global_json') {
     const timestamp = getTimestamp();
     sample.patch_key = `val_${timestamp}`;
+    // token field must exist so auto-fill below works
+    if (!sample.hasOwnProperty('token')) sample.token = '';
   }
-  
+
   // Auto-fill cached token for authenticated commands (debugging convenience)
   if (AUTHENTICATED_COMMANDS.includes(c.name)) {
     const cachedToken = getCachedToken();
@@ -262,7 +377,14 @@ function fillCmd(c) {
   }
   
   updateCurl();
+
+  // Show history for this command
+  renderHistory(c.name);
 }
+
+// ---------------------------------------------------------------------------
+// Curl generation
+// ---------------------------------------------------------------------------
 
 function switchOS(os) {
   curlOS = os;
@@ -390,6 +512,10 @@ function fallbackCopy(text, btn, originalText) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Run command
+// ---------------------------------------------------------------------------
+
 async function runCmd() {
   const cmd  = document.getElementById('cmdInput').value.trim();
   const args_raw = document.getElementById('argsInput').value.trim();
@@ -431,9 +557,17 @@ async function runCmd() {
     if (isSuccess && AUTHENTICATED_COMMANDS.includes(cmd) && args.token) {
       saveToken(args.token);
     }
+
+    // Save to history
+    saveHistory(cmd, args, isSuccess);
+    renderHistory(cmd);
   } catch(e) {
     box.className = 'result-box err';
     box.textContent = 'fetch error: ' + e.message;
+
+    // Save failed attempt to history
+    saveHistory(cmd, args, false);
+    renderHistory(cmd);
   }
 }
 

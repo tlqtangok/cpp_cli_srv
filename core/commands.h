@@ -431,13 +431,27 @@ inline void register_all(Engine& e, const std::string& token = "")
     //   {"cmd":"patch_global_json","args":{"age":31,"city":"NYC"}}
     // -------------------------------------------------------------------------
     e.reg(
-        { "patch_global_json", "Apply JSON merge patch and return diff",
-          { } },  // No specific args - entire args object is the patch
-        [&e](const json& args) -> Result
+        { "patch_global_json", "Apply JSON merge patch and return diff (requires token)",
+          { {"token", "Security token", false, ""} } },  // token field; rest of args is the patch
+        [&e, token](const json& args) -> Result
         {
             try {
-                // Use the entire args object as the patch
-                json diff = e.patch_global_json(args);
+                // Token authentication
+                if (!token.empty())
+                {
+                    std::string req_token = args.value("token", "");
+                    if (req_token != token)
+                    {
+                        return { 6, "", "patch_global_json requires valid token" };
+                    }
+                }
+
+                // Remove "token" field before applying patch so it doesn't pollute global JSON
+                json patch = args;
+                patch.erase("token");
+
+                // Use the cleaned args object as the patch
+                json diff = e.patch_global_json(patch);
                 return { 0, diff.dump(), "" };
             } catch (const std::exception& ex) {
                 return { 3, "", std::string("exception: ") + ex.what() };

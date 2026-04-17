@@ -388,7 +388,7 @@ Then rebuild. The new command is immediately available in both CLI and Web GUI.
 |---------|------|-------------|
 | `get_global_json` | Token | Get entire JSON or value at `path` |
 | `set_global_json` | Token | Replace entire global JSON (`value` param) |
-| `patch_global_json` | Token | Apply RFC 7386 merge patch (remaining args = patch) |
+| `patch_global_json` | Token | Apply RFC 7386 merge patch. `token` field is validated and removed before patching. |
 | `persist_global_json` | No | Force save global JSON to disk immediately |
 
 ---
