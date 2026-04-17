@@ -323,7 +323,7 @@ int main(int argc, char* argv[])
     size_t      threads     = THREAD_POOL_SIZE;
     bool        no_ipv6     = false;
     std::string logfile     = "";
-    std::string token       = "jd";           // Default token for security
+    std::string token       = "your_token";   // Default token for security
     std::string ssl_dir     = "";             // SSL certificate directory
 
     for (int i = 1; i < argc; ++i)

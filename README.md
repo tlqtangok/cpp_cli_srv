@@ -197,7 +197,7 @@ curl -X POST http://localhost:8080/post/run \
   -H 'Content-Type: application/json' \
   -d '{"cmd":"get_global_json","args":{"path":"/user/name","token":"mytoken"}}'
 
-# Apply merge patch (RFC 7386)
+# Apply merge patch (RFC 7386) - requires token
 curl -X POST http://localhost:8080/post/run \
   -H 'Content-Type: application/json' \
   -d '{"cmd":"patch_global_json","args":{"price":99,"city":null,"token":"mytoken"}}'

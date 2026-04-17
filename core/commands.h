@@ -106,8 +106,8 @@ inline void register_all(Engine& e, const std::string& token = "")
     //   - token: Security token (required if server has token enabled)
     //
     // Examples:
-    //   Windows: {"cmd":"call_shell","args":{"command":"where cmd","token":"jd"}}
-    //   Linux:   {"cmd":"call_shell","args":{"command":"ls -la","token":"jd"}}
+    //   Windows: {"cmd":"call_shell","args":{"command":"where cmd","token":"your_token"}}
+    //   Linux:   {"cmd":"call_shell","args":{"command":"ls -la","token":"your_token"}}
     // -------------------------------------------------------------------------
     
     // Set platform-specific default example command
@@ -326,8 +326,8 @@ inline void register_all(Engine& e, const std::string& token = "")
     //   - Error: {"code":6, "output":"", "error":"authentication error"}
     //
     // Examples:
-    //   {"cmd":"get_global_json","args":{"token":"jd"}}
-    //   {"cmd":"get_global_json","args":{"path":"/user/name","token":"jd"}}
+    //   {"cmd":"get_global_json","args":{"token":"your_token"}}
+    //   {"cmd":"get_global_json","args":{"path":"/user/name","token":"your_token"}}
     // -------------------------------------------------------------------------
     e.reg(
         { "get_global_json", "Get global JSON (requires token)",
@@ -378,7 +378,7 @@ inline void register_all(Engine& e, const std::string& token = "")
     //   - Error: {"code":6, "output":"", "error":"authentication error"}
     //
     // Examples:
-    //   {"cmd":"set_global_json","args":{"value":{"key":"value"},"token":"jd"}}
+    //   {"cmd":"set_global_json","args":{"value":{"key":"value"},"token":"your_token"}}
     // -------------------------------------------------------------------------
     e.reg(
         { "set_global_json", "Replace entire global JSON (requires token)",

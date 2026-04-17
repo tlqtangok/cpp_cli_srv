@@ -50,17 +50,17 @@ std::string get_server_token()
     
     // Check if file exists
     if (!std::filesystem::exists(srv_file)) {
-        return "jd";  // Default token if no server info
+        return "your_token";  // Default token if no server info
     }
     
     try {
         std::ifstream file(srv_file);
         if (!file.is_open()) {
-            return "jd";
+            return "your_token";
         }
         
         int pid = -1;
-        std::string token = "jd";
+        std::string token = "your_token";
         std::string line;
         
         while (std::getline(file, line)) {
@@ -78,17 +78,17 @@ std::string get_server_token()
         } else {
             // Server not running, delete stale file
             std::filesystem::remove(srv_file);
-            return "jd";  // Use default
+            return "your_token";  // Use default
         }
     } catch (...) {
-        return "jd";  // Default on any error
+        return "your_token";  // Default on any error
     }
 }
 
 int main(int argc, char* argv[])
 {
     Engine e(true);  // true = immediate persist mode for CLI
-    // Try to get token from running server, otherwise use default "jd"
+    // Try to get token from running server, otherwise use default "your_token"
     std::string token = get_server_token();
     register_all(e, token);
 
@@ -134,16 +134,16 @@ int main(int argc, char* argv[])
                       << "    cpp_cli -d '{\"cmd\":\"upper\",\"args\":{\"text\":\"hello\"}}'\n\n"
                       << "  call_shell - Execute shell command (requires token)\n"
 #ifdef _WIN32
-                      << "    cpp_cli -d '{\"cmd\":\"call_shell\",\"args\":{\"command\":\"where cmd\",\"token\":\"jd\"}}'\n\n"
+                      << "    cpp_cli -d '{\"cmd\":\"call_shell\",\"args\":{\"command\":\"where cmd\",\"token\":\"your_token\"}}'\n\n"
 #else
-                      << "    cpp_cli -d '{\"cmd\":\"call_shell\",\"args\":{\"command\":\"ls -la\",\"token\":\"jd\"}}'\n\n"
+                      << "    cpp_cli -d '{\"cmd\":\"call_shell\",\"args\":{\"command\":\"ls -la\",\"token\":\"your_token\"}}'\n\n"
 #endif
                       << "  get_global_json - Get global JSON (requires token)\n"
-                      << "    cpp_cli -d '{\"cmd\":\"get_global_json\",\"args\":{\"token\":\"jd\"}}'\n\n"
+                      << "    cpp_cli -d '{\"cmd\":\"get_global_json\",\"args\":{\"token\":\"your_token\"}}'\n\n"
                       << "  set_global_json - Replace entire global JSON (requires token)\n"
-                      << "    cpp_cli -d '{\"cmd\":\"set_global_json\",\"args\":{\"value\":{\"name\":\"Alice\"},\"token\":\"jd\"}}'\n\n"
-                      << "  patch_global_json - Apply JSON merge patch\n"
-                      << "    cpp_cli -d '{\"cmd\":\"patch_global_json\",\"args\":{\"age\":31,\"city\":\"NYC\"}}'\n\n"
+                      << "    cpp_cli -d '{\"cmd\":\"set_global_json\",\"args\":{\"value\":{\"name\":\"Alice\"},\"token\":\"your_token\"}}'\n\n"
+                      << "  patch_global_json - Apply JSON merge patch (requires token)\n"
+                      << "    cpp_cli -d '{\"cmd\":\"patch_global_json\",\"args\":{\"age\":31,\"city\":\"NYC\",\"token\":\"your_token\"}}'\n\n"
                       << "Output Format:\n"
                       << "  Default (JSON): {\"code\":0,\"output\":\"...\",\"error\":\"\"}\n"
                       << "  With --human:   [OK] result\\n<output>\n\n"
