@@ -87,7 +87,10 @@
       <input type="text" id="cmdInput" placeholder="e.g. echo" oninput="updateCurl()" />
     </div>
     <div>
-      <label>Args (JSON) <span style="color:#718096;font-size:.75rem">(token auto-filled from last success for debugging)</span></label>
+      <div class="curl-label">
+        <label>Args (JSON) <span style="color:#718096;font-size:.75rem">(token auto-filled from last success for debugging)</span></label>
+        <button class="copy-btn" onclick="copyArgs()">📋 Copy</button>
+      </div>
       <textarea id="argsInput" rows="8" placeholder='{"text": "hello"}' oninput="updateCurl()"></textarea>
     </div>
     <div>
@@ -107,7 +110,10 @@
       <button id="runBtn" onclick="runCmd()">▶ Run</button>
       <label style="color:#718096;font-size:.8rem">Ctrl+Enter to run</label>
     </div>
-    <label>Result</label>
+    <div class="curl-label">
+      <label>Result</label>
+      <button class="copy-btn" onclick="copyResult()">📋 Copy</button>
+    </div>
     <div class="result-box" id="result">— waiting —</div>
     <!-- History panel -->
     <div class="history-section" id="historySection">
@@ -164,13 +170,14 @@ function getHistory(cmd) {
   } catch { return []; }
 }
 
-function saveHistory(cmd, args, success) {
+function saveHistory(cmd, args, success, output) {
   const list = getHistory(cmd);
   // Add to front
   list.unshift({
     time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
     args: args,
-    success: success
+    success: success,
+    output: output || ''
   });
   // Trim to max
   while (list.length > MAX_HISTORY) list.pop();
@@ -225,6 +232,13 @@ function renderHistory(cmd) {
 function loadHistoryEntry(entry) {
   document.getElementById('argsInput').value = JSON.stringify(entry.args, null, 2);
   updateCurl();
+  
+  // Restore output if available
+  const box = document.getElementById('result');
+  if (entry.output) {
+    box.className = 'result-box' + (entry.success ? '' : ' err');
+    box.textContent = entry.output;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -513,6 +527,68 @@ function fallbackCopy(text, btn, originalText) {
 }
 
 // ---------------------------------------------------------------------------
+// Copy buttons for Args and Result
+// ---------------------------------------------------------------------------
+
+function copyArgs() {
+  const argsInput = document.getElementById('argsInput');
+  const text = argsInput.value.trim();
+  const btn = event.target;
+  const originalText = btn.textContent;
+  
+  if (!text) {
+    btn.textContent = '⚠ Empty';
+    btn.style.background = '#744210';
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.style.background = '';
+    }, 2000);
+    return;
+  }
+  
+  copyToClipboard(text, btn, originalText);
+}
+
+function copyResult() {
+  const resultBox = document.getElementById('result');
+  const text = resultBox.textContent.trim();
+  const btn = event.target;
+  const originalText = btn.textContent;
+  
+  if (text === '— waiting —' || !text) {
+    btn.textContent = '⚠ Empty';
+    btn.style.background = '#744210';
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.style.background = '';
+    }, 2000);
+    return;
+  }
+  
+  copyToClipboard(text, btn, originalText);
+}
+
+function copyToClipboard(text, btn, originalText) {
+  // Try modern clipboard API first
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '✓ Copied';
+      btn.style.background = '#276749';
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.background = '';
+      }, 2000);
+    }).catch(err => {
+      // If clipboard API fails, use fallback
+      fallbackCopy(text, btn, originalText);
+    });
+  } else {
+    // Use fallback for older browsers
+    fallbackCopy(text, btn, originalText);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Run command
 // ---------------------------------------------------------------------------
 
@@ -549,8 +625,9 @@ async function runCmd() {
     
     // Handle new JSON format: check "code" instead of "ok"
     const isSuccess = data.code === 0;
+    const outputText = JSON.stringify(data, null, 2);
     box.className = 'result-box' + (isSuccess ? '' : ' err');
-    box.textContent = JSON.stringify(data, null, 2);
+    box.textContent = outputText;
     
     // Save token to localStorage when authenticated command succeeds
     // This enables auto-fill for debugging convenience
@@ -558,15 +635,16 @@ async function runCmd() {
       saveToken(args.token);
     }
 
-    // Save to history
-    saveHistory(cmd, args, isSuccess);
+    // Save to history with output
+    saveHistory(cmd, args, isSuccess, outputText);
     renderHistory(cmd);
   } catch(e) {
+    const errorText = 'fetch error: ' + e.message;
     box.className = 'result-box err';
-    box.textContent = 'fetch error: ' + e.message;
+    box.textContent = errorText;
 
-    // Save failed attempt to history
-    saveHistory(cmd, args, false);
+    // Save failed attempt to history with error output
+    saveHistory(cmd, args, false, errorText);
     renderHistory(cmd);
   }
 }
