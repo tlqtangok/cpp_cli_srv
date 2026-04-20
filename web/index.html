@@ -74,6 +74,32 @@
     color: #a0aec0; font-size: .7rem; cursor: pointer; transition: background .15s; }
   .json-btn:hover { background: #4a5568; color: #e2e8f0; }
   .json-btn:active { background: #2b6cb0; }
+  
+  /* JSON Tree Viewer */
+  .json-viewer { background: #1a202c; border: 1px solid #2d3748; border-radius: 8px;
+    font-family: 'Consolas', monospace; font-size: .85rem; overflow: auto; min-height: 180px;
+    display: flex; }
+  .json-viewer.err { border-color: #fc8181; }
+  .json-line-numbers { background: #151a23; color: #4a5568; padding: 14px 8px 14px 12px;
+    text-align: right; user-select: none; border-right: 1px solid #2d3748; min-width: 45px; }
+  .json-content { flex: 1; padding: 14px; color: #68d391; white-space: pre; overflow-x: auto; }
+  .json-content.err { color: #fc8181; }
+  .json-line { display: block; line-height: 1.5; }
+  .json-key { color: #63b3ed; }
+  .json-string { color: #68d391; }
+  .json-number { color: #f6ad55; }
+  .json-boolean { color: #9f7aea; }
+  .json-null { color: #718096; }
+  .json-toggle { display: inline-block; cursor: pointer; color: #a0aec0; width: 14px;
+    text-align: center; margin-right: 4px; user-select: none; }
+  .json-toggle:hover { color: #e2e8f0; }
+  .json-toggle.collapsed::before { content: '▶'; }
+  .json-toggle.expanded::before { content: '▼'; }
+  .json-toggle.empty { visibility: hidden; }
+  .json-collapsible { display: inline; }
+  .json-collapsible.hidden { display: none; }
+  .json-placeholder { color: #718096; font-style: italic; }
+
 </style>
 </head>
 <body>
@@ -127,13 +153,16 @@
       <label>Result</label>
       <div style="display:flex;gap:8px;">
         <div class="json-tools">
-          <button class="json-btn" onclick="formatResultJson()">✨ Format</button>
-          <button class="json-btn" onclick="collapseResultJson()">📦 Compact</button>
+          <button class="json-btn" onclick="expandAllResult()">📂 Expand All</button>
+          <button class="json-btn" onclick="collapseAllResult()">📁 Collapse All</button>
         </div>
         <button class="copy-btn" onclick="copyResult()">📋 Copy</button>
       </div>
     </div>
-    <div class="result-box" id="result">— waiting —</div>
+    <div class="json-viewer" id="resultViewer">
+      <div class="json-line-numbers" id="resultLineNumbers">1</div>
+      <div class="json-content" id="result">— waiting —</div>
+    </div>
     <!-- History panel -->
     <div class="history-section" id="historySection">
       <div class="history-header">
@@ -253,10 +282,12 @@ function loadHistoryEntry(entry) {
   updateCurl();
   
   // Restore output if available
-  const box = document.getElementById('result');
   if (entry.output) {
-    box.className = 'result-box' + (entry.success ? '' : ' err');
-    box.textContent = entry.output;
+    renderJsonTree(entry.output, 'result', 'resultLineNumbers');
+    const box = document.getElementById('result');
+    if (!entry.success) {
+      box.classList.add('err');
+    }
   }
 }
 
@@ -584,7 +615,15 @@ function copyResult() {
     return;
   }
   
-  copyToClipboard(text, btn, originalText);
+  // Try to format as JSON before copying
+  try {
+    const parsed = JSON.parse(text);
+    const formatted = JSON.stringify(parsed, null, 2);
+    copyToClipboard(formatted, btn, originalText);
+  } catch(e) {
+    // Not valid JSON, copy as-is
+    copyToClipboard(text, btn, originalText);
+  }
 }
 
 function copyToClipboard(text, btn, originalText) {
@@ -651,42 +690,270 @@ function collapseArgsJson() {
   }
 }
 
-function formatResultJson() {
-  const resultBox = document.getElementById('result');
-  const text = resultBox.textContent.trim();
-  const btn = event.target;
+// ---------------------------------------------------------------------------
+// JSON Tree Viewer - Interactive collapsible JSON with line numbers
+// ---------------------------------------------------------------------------
+
+function renderJsonTree(json, targetId, lineNumbersId) {
+  const target = document.getElementById(targetId);
+  const lineNumbersDiv = document.getElementById(lineNumbersId);
   
-  if (text === '— waiting —' || !text) {
-    showButtonFeedback(btn, '⚠ Empty', '#744210');
+  if (!json || json === '— waiting —') {
+    target.textContent = json || '— waiting —';
+    lineNumbersDiv.textContent = '1';
     return;
   }
   
   try {
-    const parsed = JSON.parse(text);
-    resultBox.textContent = JSON.stringify(parsed, null, 2);
-    showButtonFeedback(btn, '✓ Done', '#276749');
+    const parsed = typeof json === 'string' ? JSON.parse(json) : json;
+    const { html, lineCount } = buildJsonHtml(parsed, 0);
+    target.innerHTML = html;
+    
+    // Generate line numbers
+    let lineNumbers = '';
+    for (let i = 1; i <= lineCount; i++) {
+      lineNumbers += i + '\n';
+    }
+    lineNumbersDiv.textContent = lineNumbers.trim();
+    
+    // Attach toggle event listeners
+    target.querySelectorAll('.json-toggle').forEach(toggle => {
+      toggle.addEventListener('click', function() {
+        toggleJsonNode(this);
+      });
+    });
+    
+    target.classList.remove('err');
   } catch (e) {
-    showButtonFeedback(btn, '✗ Invalid', '#742a2a');
+    target.textContent = json;
+    target.classList.add('err');
+    lineNumbersDiv.textContent = '1';
   }
 }
 
-function collapseResultJson() {
+function buildJsonHtml(obj, depth, key = null) {
+  const indent = '  '.repeat(depth);
+  let html = '';
+  let lineCount = 0;
+  
+  const addLine = (content) => {
+    html += indent + content + '\n';
+    lineCount++;
+  };
+  
+  if (obj === null) {
+    if (key !== null) {
+      addLine(`<span class="json-key">"${escapeHtml(key)}"</span>: <span class="json-null">null</span>`);
+    } else {
+      addLine(`<span class="json-null">null</span>`);
+    }
+  } else if (typeof obj === 'boolean') {
+    if (key !== null) {
+      addLine(`<span class="json-key">"${escapeHtml(key)}"</span>: <span class="json-boolean">${obj}</span>`);
+    } else {
+      addLine(`<span class="json-boolean">${obj}</span>`);
+    }
+  } else if (typeof obj === 'number') {
+    if (key !== null) {
+      addLine(`<span class="json-key">"${escapeHtml(key)}"</span>: <span class="json-number">${obj}</span>`);
+    } else {
+      addLine(`<span class="json-number">${obj}</span>`);
+    }
+  } else if (typeof obj === 'string') {
+    if (key !== null) {
+      addLine(`<span class="json-key">"${escapeHtml(key)}"</span>: <span class="json-string">"${escapeHtml(obj)}"</span>`);
+    } else {
+      addLine(`<span class="json-string">"${escapeHtml(obj)}"</span>`);
+    }
+  } else if (Array.isArray(obj)) {
+    const isEmpty = obj.length === 0;
+    const toggleClass = isEmpty ? 'json-toggle empty' : 'json-toggle expanded';
+    const keyPart = key !== null ? `<span class="json-key">"${escapeHtml(key)}"</span>: ` : '';
+    
+    if (isEmpty) {
+      addLine(`${keyPart}<span class="${toggleClass}"></span>[]`);
+    } else {
+      addLine(`${keyPart}<span class="${toggleClass}"></span><span class="json-collapsible">[</span>`);
+      
+      for (let i = 0; i < obj.length; i++) {
+        const { html: childHtml, lineCount: childLines } = buildJsonHtml(obj[i], depth + 1);
+        html += childHtml.trimEnd();
+        if (i < obj.length - 1) html += ',';
+        html += '\n';
+        lineCount += childLines;
+      }
+      
+      addLine(`<span class="json-collapsible">]</span>`);
+    }
+  } else if (typeof obj === 'object') {
+    const keys = Object.keys(obj);
+    const isEmpty = keys.length === 0;
+    const toggleClass = isEmpty ? 'json-toggle empty' : 'json-toggle expanded';
+    const keyPart = key !== null ? `<span class="json-key">"${escapeHtml(key)}"</span>: ` : '';
+    
+    if (isEmpty) {
+      addLine(`${keyPart}<span class="${toggleClass}"></span>{}`);
+    } else {
+      addLine(`${keyPart}<span class="${toggleClass}"></span><span class="json-collapsible">{</span>`);
+      
+      keys.forEach((k, idx) => {
+        const { html: childHtml, lineCount: childLines } = buildJsonHtml(obj[k], depth + 1, k);
+        html += childHtml.trimEnd();
+        if (idx < keys.length - 1) html += ',';
+        html += '\n';
+        lineCount += childLines;
+      });
+      
+      addLine(`<span class="json-collapsible">}</span>`);
+    }
+  }
+  
+  return { html, lineCount };
+}
+
+function toggleJsonNode(toggleElement) {
+  const isExpanded = toggleElement.classList.contains('expanded');
+  
+  if (isExpanded) {
+    // Collapse
+    toggleElement.classList.remove('expanded');
+    toggleElement.classList.add('collapsed');
+    
+    // Hide all siblings until the closing bracket
+    let sibling = toggleElement.nextElementSibling;
+    let depth = 0;
+    const collapsedNodes = [];
+    
+    while (sibling) {
+      if (sibling.classList && sibling.classList.contains('json-collapsible')) {
+        collapsedNodes.push(sibling);
+        const text = sibling.textContent.trim();
+        if (text === '{' || text === '[') depth++;
+        if (text === '}' || text === ']') {
+          depth--;
+          if (depth < 0) {
+            sibling.classList.add('hidden');
+            break;
+          }
+        }
+        sibling.classList.add('hidden');
+      }
+      sibling = sibling.nextSibling;
+      if (!sibling || (sibling.nodeType === Node.TEXT_NODE && sibling.textContent.includes('\n'))) {
+        break;
+      }
+    }
+    
+    // Show placeholder
+    const placeholder = document.createElement('span');
+    placeholder.className = 'json-placeholder json-collapsible';
+    const prevText = toggleElement.previousSibling?.textContent || '';
+    if (prevText.includes('[')) {
+      placeholder.textContent = '[...]';
+    } else {
+      placeholder.textContent = '{...}';
+    }
+    toggleElement.parentNode.insertBefore(placeholder, toggleElement.nextSibling);
+    
+  } else {
+    // Expand
+    toggleElement.classList.remove('collapsed');
+    toggleElement.classList.add('expanded');
+    
+    // Remove placeholder
+    let sibling = toggleElement.nextElementSibling;
+    if (sibling && sibling.classList.contains('json-placeholder')) {
+      sibling.remove();
+    }
+    
+    // Show direct children only (not nested collapsed content)
+    sibling = toggleElement.nextElementSibling;
+    let depth = 0;
+    
+    while (sibling) {
+      if (sibling.classList && sibling.classList.contains('json-collapsible')) {
+        const text = sibling.textContent.trim();
+        if (text === '{' || text === '[') depth++;
+        
+        if (depth === 0) {
+          sibling.classList.remove('hidden');
+        }
+        
+        if (text === '}' || text === ']') {
+          if (depth === 0) {
+            sibling.classList.remove('hidden');
+            break;
+          }
+          depth--;
+        }
+      }
+      sibling = sibling.nextSibling;
+      if (!sibling || (sibling.nodeType === Node.TEXT_NODE && sibling.textContent.includes('\n'))) {
+        break;
+      }
+    }
+  }
+  
+  updateLineNumbers();
+}
+
+function updateLineNumbers() {
+  const resultContent = document.getElementById('result');
+  const lineNumbersDiv = document.getElementById('resultLineNumbers');
+  const lines = resultContent.innerHTML.split('\n').filter(line => {
+    // Count only visible lines
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = line;
+    const hasHidden = tempDiv.querySelector('.hidden');
+    return !hasHidden && line.trim();
+  });
+  
+  let lineNumbers = '';
+  for (let i = 1; i <= lines.length; i++) {
+    lineNumbers += i + '\n';
+  }
+  lineNumbersDiv.textContent = lineNumbers.trim();
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function expandAllResult() {
+  const result = document.getElementById('result');
+  result.querySelectorAll('.json-toggle.collapsed').forEach(toggle => {
+    toggle.click();
+  });
+  showButtonFeedback(event.target, '✓ Expanded', '#276749');
+}
+
+function collapseAllResult() {
+  const result = document.getElementById('result');
+  result.querySelectorAll('.json-toggle.expanded').forEach(toggle => {
+    toggle.click();
+  });
+  showButtonFeedback(event.target, '✓ Collapsed', '#276749');
+}
+
+function formatResultJson() {
+  // Legacy support - now uses tree viewer
   const resultBox = document.getElementById('result');
   const text = resultBox.textContent.trim();
-  const btn = event.target;
   
   if (text === '— waiting —' || !text) {
-    showButtonFeedback(btn, '⚠ Empty', '#744210');
+    showButtonFeedback(event.target, '⚠ Empty', '#744210');
     return;
   }
   
-  try {
-    const parsed = JSON.parse(text);
-    resultBox.textContent = JSON.stringify(parsed);
-    showButtonFeedback(btn, '✓ Done', '#276749');
-  } catch (e) {
-    showButtonFeedback(btn, '✗ Invalid', '#742a2a');
-  }
+  renderJsonTree(text, 'result', 'resultLineNumbers');
+  showButtonFeedback(event.target, '✓ Done', '#276749');
+}
+
+function collapseResultJson() {
+  // Legacy support
+  formatResultJson();
 }
 
 function showButtonFeedback(btn, text, bgColor) {
@@ -708,19 +975,29 @@ async function runCmd() {
   const cmd  = document.getElementById('cmdInput').value.trim();
   const args_raw = document.getElementById('argsInput').value.trim();
   const box  = document.getElementById('result');
-  if (!cmd) { box.textContent = 'please enter a command'; return; }
+  if (!cmd) { 
+    box.textContent = 'please enter a command';
+    document.getElementById('resultLineNumbers').textContent = '1';
+    return;
+  }
   
   // Check if command is disabled in config
   if (commandConfig[cmd] === false) {
-    box.className = 'result-box err';
+    box.classList.add('err');
     box.textContent = `Error: Command "${cmd}" is disabled in server configuration`;
+    document.getElementById('resultLineNumbers').textContent = '1';
     return;
   }
   
   let args = {};
   if (args_raw) {
     try { args = JSON.parse(args_raw); }
-    catch { box.className = 'result-box err'; box.textContent = 'invalid JSON in args'; return; }
+    catch { 
+      box.classList.add('err');
+      box.textContent = 'invalid JSON in args';
+      document.getElementById('resultLineNumbers').textContent = '1';
+      return;
+    }
   }
 
   // User must provide token manually for authenticated commands
@@ -738,8 +1015,9 @@ async function runCmd() {
     // Handle new JSON format: check "code" instead of "ok"
     const isSuccess = data.code === 0;
     const outputText = JSON.stringify(data, null, 2);
-    box.className = 'result-box' + (isSuccess ? '' : ' err');
-    box.textContent = outputText;
+    
+    // Render JSON tree viewer
+    renderJsonTree(data, 'result', 'resultLineNumbers');
     
     // Save token to localStorage when authenticated command succeeds
     // This enables auto-fill for debugging convenience
@@ -752,8 +1030,9 @@ async function runCmd() {
     renderHistory(cmd);
   } catch(e) {
     const errorText = 'fetch error: ' + e.message;
-    box.className = 'result-box err';
+    box.classList.add('err');
     box.textContent = errorText;
+    document.getElementById('resultLineNumbers').textContent = '1';
 
     // Save failed attempt to history with error output
     saveHistory(cmd, args, false, errorText);
