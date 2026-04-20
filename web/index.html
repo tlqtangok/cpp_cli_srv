@@ -43,18 +43,27 @@
     color: #a0aec0; font-size: .75rem; cursor: pointer; transition: all .15s; }
   .os-btn.active { background: #2b6cb0; border-color: #63b3ed; color: #fff; }
   .os-btn:hover:not(.active) { background: #2d3748; }
+  .view-toggle { display: flex; gap: 4px; }
+  .view-btn { padding: 4px 12px; background: #1a202c; border: 1px solid #2d3748; border-radius: 4px;
+    color: #a0aec0; font-size: .75rem; cursor: pointer; transition: all .15s; }
+  .view-btn.active { background: #2b6cb0; border-color: #63b3ed; color: #fff; }
+  .view-btn:hover:not(.active) { background: #2d3748; }
   .tag { font-size: .7rem; padding: 2px 7px; border-radius: 10px; background: #2d3748; color: #a0aec0; }
 
   /* History panel */
   .history-section { display: none; }
   .history-section.visible { display: block; }
   .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .history-header label { margin-bottom: 0; }
+  .history-header label { margin-bottom: 0; user-select: none; }
+  #historyToggleIcon { display: inline-block; width: 16px; text-align: center; font-size: .9rem; 
+    transition: transform .15s; }
+  .history-list { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; 
+    transition: all .25s; }
+  .history-list.collapsed { max-height: 0; overflow: hidden; opacity: 0; }
   .clear-history-btn {
     padding: 3px 10px; background: transparent; border: 1px solid #4a5568; border-radius: 4px;
     color: #718096; font-size: .7rem; cursor: pointer; transition: all .15s; }
   .clear-history-btn:hover { background: #742a2a; border-color: #fc8181; color: #fc8181; }
-  .history-list { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
   .history-item {
     display: flex; align-items: center; gap: 8px; padding: 6px 10px;
     background: #1a202c; border: 1px solid #2d3748; border-radius: 6px;
@@ -162,9 +171,9 @@
     <div class="json-viewer" id="result">— waiting —</div>
     <!-- History panel -->
     <div class="history-section" id="historySection">
-      <div class="history-header">
-        <label>📜 Recent History (last 10 runs)</label>
-        <button class="clear-history-btn" onclick="clearHistory()">Clear</button>
+      <div class="history-header" onclick="toggleHistory()" style="cursor:pointer;">
+        <label><span id="historyToggleIcon">▼</span> Recent History (last 10 runs)</label>
+        <button class="clear-history-btn" onclick="event.stopPropagation();clearHistory()">Clear</button>
       </div>
       <div class="history-list" id="historyList"></div>
     </div>
@@ -239,6 +248,7 @@ function clearHistory() {
 function renderHistory(cmd) {
   const section = document.getElementById('historySection');
   const list = document.getElementById('historyList');
+  const icon = document.getElementById('historyToggleIcon');
   const entries = getHistory(cmd);
 
   if (!cmd || entries.length === 0) {
@@ -248,6 +258,11 @@ function renderHistory(cmd) {
 
   section.classList.add('visible');
   list.innerHTML = '';
+  
+  // Default to collapsed state
+  list.classList.add('collapsed');
+  icon.textContent = '▶';
+  
   entries.forEach((entry, idx) => {
     const div = document.createElement('div');
     div.className = 'history-item';
@@ -286,6 +301,87 @@ function loadHistoryEntry(entry) {
       box.classList.add('err');
     }
   }
+  
+  // Switch Args to text view when loading history
+  const argsInput = document.getElementById('argsInput');
+  const argsTree = document.getElementById('argsTree');
+  argsInput.style.display = 'block';
+  argsTree.style.display = 'none';
+  document.getElementById('argsTextBtn').classList.add('active');
+  document.getElementById('argsTreeBtn').classList.remove('active');
+  document.getElementById('argsTreeTools').style.display = 'none';
+}
+
+// Toggle history list visibility
+function toggleHistory() {
+  const list = document.getElementById('historyList');
+  const icon = document.getElementById('historyToggleIcon');
+  
+  if (list.classList.contains('collapsed')) {
+    list.classList.remove('collapsed');
+    icon.textContent = '▼';
+  } else {
+    list.classList.add('collapsed');
+    icon.textContent = '▶';
+  }
+}
+
+// Switch Args view between text and tree
+function switchArgsView(mode) {
+  const argsInput = document.getElementById('argsInput');
+  const argsTree = document.getElementById('argsTree');
+  const textBtn = document.getElementById('argsTextBtn');
+  const treeBtn = document.getElementById('argsTreeBtn');
+  const treeTools = document.getElementById('argsTreeTools');
+  
+  if (mode === 'tree') {
+    // Parse and render JSON tree
+    try {
+      const text = argsInput.value.trim();
+      if (!text) {
+        alert('Please enter JSON content first');
+        return;
+      }
+      const json = JSON.parse(text);
+      renderJsonTree(json, 'argsTree');
+      
+      argsInput.style.display = 'none';
+      argsTree.style.display = 'block';
+      textBtn.classList.remove('active');
+      treeBtn.classList.add('active');
+      treeTools.style.display = 'flex';
+    } catch (e) {
+      alert('Invalid JSON: ' + e.message);
+    }
+  } else {
+    // Switch back to text mode
+    argsInput.style.display = 'block';
+    argsTree.style.display = 'none';
+    textBtn.classList.add('active');
+    treeBtn.classList.remove('active');
+    treeTools.style.display = 'none';
+  }
+}
+
+// Expand/Collapse all nodes in Args tree
+function expandAllArgs() {
+  const container = document.getElementById('argsTree');
+  const toggles = container.querySelectorAll('.json-toggle');
+  toggles.forEach(toggle => {
+    if (toggle.textContent === '▶') {
+      toggle.click();
+    }
+  });
+}
+
+function collapseAllArgs() {
+  const container = document.getElementById('argsTree');
+  const toggles = container.querySelectorAll('.json-toggle');
+  toggles.forEach(toggle => {
+    if (toggle.textContent === '▼') {
+      toggle.click();
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -579,9 +675,21 @@ function fallbackCopy(text, btn, originalText) {
 
 function copyArgs() {
   const argsInput = document.getElementById('argsInput');
-  const text = argsInput.value.trim();
+  const argsTree = document.getElementById('argsTree');
   const btn = event.target;
   const originalText = btn.textContent;
+  
+  let text = '';
+  
+  // Check which view is active
+  if (argsInput.style.display !== 'none') {
+    // Text view
+    text = argsInput.value.trim();
+  } else {
+    // Tree view - extract from tree
+    const lines = Array.from(argsTree.querySelectorAll('.json-line:not(.json-collapsed-content) .json-content'));
+    text = lines.map(line => line.textContent).join('\n').trim();
+  }
   
   if (!text) {
     btn.textContent = '⚠ Empty';
@@ -593,7 +701,15 @@ function copyArgs() {
     return;
   }
   
-  copyToClipboard(text, btn, originalText);
+  // Try to format as JSON before copying
+  try {
+    const parsed = JSON.parse(text);
+    const formatted = JSON.stringify(parsed, null, 2);
+    copyToClipboard(formatted, btn, originalText);
+  } catch(e) {
+    // Not valid JSON, copy as-is
+    copyToClipboard(text, btn, originalText);
+  }
 }
 
 function copyResult() {
