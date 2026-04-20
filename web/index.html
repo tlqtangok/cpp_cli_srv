@@ -67,6 +67,13 @@
   .history-item .h-status.ok { color: #68d391; }
   .history-item .h-status.fail { color: #fc8181; }
   .history-empty { color: #4a5568; font-size: .78rem; padding: 8px 0; }
+  
+  /* JSON formatting buttons */
+  .json-tools { display: flex; gap: 4px; }
+  .json-btn { padding: 4px 10px; background: #2d3748; border: none; border-radius: 4px;
+    color: #a0aec0; font-size: .7rem; cursor: pointer; transition: background .15s; }
+  .json-btn:hover { background: #4a5568; color: #e2e8f0; }
+  .json-btn:active { background: #2b6cb0; }
 </style>
 </head>
 <body>
@@ -89,7 +96,13 @@
     <div>
       <div class="curl-label">
         <label>Args (JSON) <span style="color:#718096;font-size:.75rem">(token auto-filled from last success for debugging)</span></label>
-        <button class="copy-btn" onclick="copyArgs()">📋 Copy</button>
+        <div style="display:flex;gap:8px;">
+          <div class="json-tools">
+            <button class="json-btn" onclick="formatArgsJson()">✨ Format</button>
+            <button class="json-btn" onclick="collapseArgsJson()">📦 Compact</button>
+          </div>
+          <button class="copy-btn" onclick="copyArgs()">📋 Copy</button>
+        </div>
       </div>
       <textarea id="argsInput" rows="8" placeholder='{"text": "hello"}' oninput="updateCurl()"></textarea>
     </div>
@@ -112,7 +125,13 @@
     </div>
     <div class="curl-label">
       <label>Result</label>
-      <button class="copy-btn" onclick="copyResult()">📋 Copy</button>
+      <div style="display:flex;gap:8px;">
+        <div class="json-tools">
+          <button class="json-btn" onclick="formatResultJson()">✨ Format</button>
+          <button class="json-btn" onclick="collapseResultJson()">📦 Compact</button>
+        </div>
+        <button class="copy-btn" onclick="copyResult()">📋 Copy</button>
+      </div>
     </div>
     <div class="result-box" id="result">— waiting —</div>
     <!-- History panel -->
@@ -586,6 +605,99 @@ function copyToClipboard(text, btn, originalText) {
     // Use fallback for older browsers
     fallbackCopy(text, btn, originalText);
   }
+}
+
+// ---------------------------------------------------------------------------
+// JSON Formatting Functions
+// ---------------------------------------------------------------------------
+
+function formatArgsJson() {
+  const argsInput = document.getElementById('argsInput');
+  const text = argsInput.value.trim();
+  const btn = event.target;
+  
+  if (!text) {
+    showButtonFeedback(btn, '⚠ Empty', '#744210');
+    return;
+  }
+  
+  try {
+    const parsed = JSON.parse(text);
+    argsInput.value = JSON.stringify(parsed, null, 2);
+    updateCurl();
+    showButtonFeedback(btn, '✓ Done', '#276749');
+  } catch (e) {
+    showButtonFeedback(btn, '✗ Invalid', '#742a2a');
+  }
+}
+
+function collapseArgsJson() {
+  const argsInput = document.getElementById('argsInput');
+  const text = argsInput.value.trim();
+  const btn = event.target;
+  
+  if (!text) {
+    showButtonFeedback(btn, '⚠ Empty', '#744210');
+    return;
+  }
+  
+  try {
+    const parsed = JSON.parse(text);
+    argsInput.value = JSON.stringify(parsed);
+    updateCurl();
+    showButtonFeedback(btn, '✓ Done', '#276749');
+  } catch (e) {
+    showButtonFeedback(btn, '✗ Invalid', '#742a2a');
+  }
+}
+
+function formatResultJson() {
+  const resultBox = document.getElementById('result');
+  const text = resultBox.textContent.trim();
+  const btn = event.target;
+  
+  if (text === '— waiting —' || !text) {
+    showButtonFeedback(btn, '⚠ Empty', '#744210');
+    return;
+  }
+  
+  try {
+    const parsed = JSON.parse(text);
+    resultBox.textContent = JSON.stringify(parsed, null, 2);
+    showButtonFeedback(btn, '✓ Done', '#276749');
+  } catch (e) {
+    showButtonFeedback(btn, '✗ Invalid', '#742a2a');
+  }
+}
+
+function collapseResultJson() {
+  const resultBox = document.getElementById('result');
+  const text = resultBox.textContent.trim();
+  const btn = event.target;
+  
+  if (text === '— waiting —' || !text) {
+    showButtonFeedback(btn, '⚠ Empty', '#744210');
+    return;
+  }
+  
+  try {
+    const parsed = JSON.parse(text);
+    resultBox.textContent = JSON.stringify(parsed);
+    showButtonFeedback(btn, '✓ Done', '#276749');
+  } catch (e) {
+    showButtonFeedback(btn, '✗ Invalid', '#742a2a');
+  }
+}
+
+function showButtonFeedback(btn, text, bgColor) {
+  const originalText = btn.textContent;
+  const originalBg = btn.style.background;
+  btn.textContent = text;
+  btn.style.background = bgColor;
+  setTimeout(() => {
+    btn.textContent = originalText;
+    btn.style.background = originalBg;
+  }, 2000);
 }
 
 // ---------------------------------------------------------------------------
