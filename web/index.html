@@ -140,14 +140,18 @@
       <div class="curl-label">
         <label>Args (JSON) <span style="color:#718096;font-size:.75rem">(token auto-filled from last success for debugging)</span></label>
         <div style="display:flex;gap:8px;">
-          <div class="json-tools">
-            <button class="json-btn" onclick="formatArgsJson()">✨ Format</button>
-            <button class="json-btn" onclick="collapseArgsJson()">📦 Compact</button>
+          <div class="view-toggle">
+            <button class="view-btn active" id="argsTextBtn" onclick="switchArgsView('text')">📝 Text</button>
+            <button class="view-btn" id="argsTreeBtn" onclick="switchArgsView('tree')">🌳 Tree</button>
+          </div>
+          <div class="json-tools" id="argsTreeTools" style="display:none;">
+            <button class="json-btn" id="toggleArgsBtn" onclick="toggleAllArgs()">📁 Collapse All</button>
           </div>
           <button class="copy-btn" onclick="copyArgs()">📋 Copy</button>
         </div>
       </div>
       <textarea id="argsInput" rows="8" placeholder='{"text": "hello"}' oninput="updateCurl()"></textarea>
+      <div class="json-viewer" id="argsTree" style="display:none;"></div>
     </div>
     <div>
       <div class="curl-label">
@@ -170,8 +174,7 @@
       <label>Result</label>
       <div style="display:flex;gap:8px;">
         <div class="json-tools">
-          <button class="json-btn" onclick="expandAllResult()">📂 Expand All</button>
-          <button class="json-btn" onclick="collapseAllResult()">📁 Collapse All</button>
+          <button class="json-btn" id="toggleResultBtn" onclick="toggleAllResult()">📁 Collapse All</button>
         </div>
         <button class="copy-btn" onclick="copyResult()">📋 Copy</button>
       </div>
@@ -909,10 +912,14 @@ function buildJsonLines(obj, depth, key = null) {
       
       obj.forEach((item, idx) => {
         const childLines = buildJsonLines(item, depth + 1);
+        const isLastItem = idx === obj.length - 1;
+        
         childLines.forEach((line, lineIdx) => {
-          const isLast = idx === obj.length - 1 && lineIdx === childLines.length - 1;
+          const isLastLineOfItem = lineIdx === childLines.length - 1;
+          const needsComma = !isLastItem && isLastLineOfItem;
+          
           lines.push({ 
-            html: line.html + (isLast ? '' : ','),
+            html: line.html + (needsComma ? ',' : ''),
             hidden: false,
             toggleId: toggleId,
             toggleSymbol: line.toggleSymbol
@@ -941,10 +948,14 @@ function buildJsonLines(obj, depth, key = null) {
       
       keys.forEach((k, idx) => {
         const childLines = buildJsonLines(obj[k], depth + 1, k);
+        const isLastKey = idx === keys.length - 1;
+        
         childLines.forEach((line, lineIdx) => {
-          const isLast = idx === keys.length - 1 && lineIdx === childLines.length - 1;
+          const isLastLineOfKey = lineIdx === childLines.length - 1;
+          const needsComma = !isLastKey && isLastLineOfKey;
+          
           lines.push({ 
-            html: line.html + (isLast ? '' : ','),
+            html: line.html + (needsComma ? ',' : ''),
             hidden: false,
             toggleId: toggleId,
             toggleSymbol: line.toggleSymbol
@@ -1048,6 +1059,68 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+function toggleAllResult() {
+  const result = document.getElementById('result');
+  const btn = document.getElementById('toggleResultBtn');
+  const toggles = Array.from(result.querySelectorAll('.json-toggle[data-toggle-id]'));
+  
+  if (toggles.length === 0) return;
+  
+  // Check current state - if any are expanded, collapse all; otherwise expand all
+  const hasExpanded = toggles.some(t => t.textContent === '▼');
+  
+  if (hasExpanded) {
+    // Collapse all
+    toggles.forEach(toggle => {
+      if (toggle.textContent === '▼') {
+        toggle.click();
+      }
+    });
+    btn.textContent = '📂 Expand All';
+    showButtonFeedback(btn, '✓ Collapsed', '#276749');
+  } else {
+    // Expand all
+    toggles.forEach(toggle => {
+      if (toggle.textContent === '▶') {
+        toggle.click();
+      }
+    });
+    btn.textContent = '📁 Collapse All';
+    showButtonFeedback(btn, '✓ Expanded', '#276749');
+  }
+}
+
+function toggleAllArgs() {
+  const argsTree = document.getElementById('argsTree');
+  const btn = document.getElementById('toggleArgsBtn');
+  const toggles = Array.from(argsTree.querySelectorAll('.json-toggle[data-toggle-id]'));
+  
+  if (toggles.length === 0) return;
+  
+  // Check current state
+  const hasExpanded = toggles.some(t => t.textContent === '▼');
+  
+  if (hasExpanded) {
+    // Collapse all
+    toggles.forEach(toggle => {
+      if (toggle.textContent === '▼') {
+        toggle.click();
+      }
+    });
+    btn.textContent = '📂 Expand All';
+    showButtonFeedback(btn, '✓ Collapsed', '#276749');
+  } else {
+    // Expand all
+    toggles.forEach(toggle => {
+      if (toggle.textContent === '▶') {
+        toggle.click();
+      }
+    });
+    btn.textContent = '📁 Collapse All';
+    showButtonFeedback(btn, '✓ Expanded', '#276749');
+  }
 }
 
 function expandAllResult() {
