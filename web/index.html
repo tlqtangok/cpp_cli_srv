@@ -50,8 +50,19 @@
   .view-btn:hover:not(.active) { background: #2d3748; }
   .tag { font-size: .7rem; padding: 2px 7px; border-radius: 10px; background: #2d3748; color: #a0aec0; }
 
-  /* History panel */
-  .history-section { display: none; }
+  /* History panel - positioned at bottom */
+  .history-section { 
+    position: fixed; 
+    bottom: 0; 
+    left: 220px; 
+    right: 0; 
+    background: #0f1419;
+    border-top: 2px solid #2d3748;
+    padding: 12px 32px;
+    z-index: 100;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.3);
+    display: none;
+  }
   .history-section.visible { display: block; }
   .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   .history-header label { margin-bottom: 0; user-select: none; }
@@ -59,7 +70,7 @@
     transition: transform .15s; }
   .history-list { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; 
     transition: all .25s; }
-  .history-list.collapsed { max-height: 0; overflow: hidden; opacity: 0; }
+  .history-list.collapsed { max-height: 0; overflow: hidden; opacity: 0; margin-bottom: -8px; }
   .clear-history-btn {
     padding: 3px 10px; background: transparent; border: 1px solid #4a5568; border-radius: 4px;
     color: #718096; font-size: .7rem; cursor: pointer; transition: all .15s; }
@@ -89,9 +100,12 @@
     font-family: 'Consolas', monospace; font-size: .85rem; overflow: auto; min-height: 180px;
     padding: 14px; }
   .json-viewer.err { border-color: #fc8181; color: #fc8181; }
-  .json-line { display: flex; line-height: 1.6; }
-  .json-line-num { color: #4a5568; min-width: 40px; text-align: right; padding-right: 12px;
+  .json-line { display: flex; line-height: 1.6; align-items: flex-start; }
+  .json-line-num { color: #4a5568; min-width: 40px; text-align: right; padding-right: 8px;
     user-select: none; flex-shrink: 0; }
+  .json-toggle { width: 20px; text-align: left; cursor: pointer; color: #a0aec0;
+    user-select: none; flex-shrink: 0; font-size: .85rem; line-height: 1.6; }
+  .json-toggle:hover { color: #e2e8f0; }
   .json-content { flex: 1; white-space: pre; color: #68d391; }
   .json-content.err { color: #fc8181; }
   .json-key { color: #63b3ed; }
@@ -99,12 +113,6 @@
   .json-number { color: #f6ad55; }
   .json-boolean { color: #9f7aea; }
   .json-null { color: #718096; }
-  .json-toggle { display: inline-block; cursor: pointer; color: #a0aec0; min-width: 14px;
-    margin-right: 4px; user-select: none; }
-  .json-toggle:hover { color: #e2e8f0; }
-  .json-toggle.collapsed::before { content: '▶'; }
-  .json-toggle.expanded::before { content: '▼'; }
-  .json-toggle.empty::before { content: ''; }
   .json-collapsed-content { display: none; }
   .json-placeholder { color: #718096; font-style: italic; }
 
@@ -825,8 +833,16 @@ function renderJsonTree(json, targetId) {
     
     let html = '';
     lines.forEach((line, idx) => {
-      html += `<div class="json-line ${line.hidden ? 'json-collapsed-content' : ''}">`;
+      html += `<div class="json-line ${line.hidden ? 'json-collapsed-content' : ''}" ${line.toggleId ? `data-parent-toggle="${line.toggleId}"` : ''}>`;
       html += `<span class="json-line-num">${idx + 1}</span>`;
+      
+      // Toggle column - only show triangle on toggle lines
+      if (line.toggleSymbol) {
+        html += `<span class="json-toggle" data-toggle-id="${line.toggleId}">${line.toggleSymbol}</span>`;
+      } else {
+        html += `<span class="json-toggle"></span>`;
+      }
+      
       html += `<span class="json-content">${line.html}</span>`;
       html += `</div>`;
     });
@@ -835,7 +851,7 @@ function renderJsonTree(json, targetId) {
     target.classList.remove('err');
     
     // Attach toggle event listeners
-    target.querySelectorAll('.json-toggle').forEach(toggle => {
+    target.querySelectorAll('.json-toggle[data-toggle-id]').forEach(toggle => {
       toggle.addEventListener('click', function(e) {
         e.stopPropagation();
         toggleJsonNode(this);
@@ -878,7 +894,6 @@ function buildJsonLines(obj, depth, key = null) {
   }
   else if (Array.isArray(obj)) {
     const isEmpty = obj.length === 0;
-    const toggleClass = isEmpty ? 'json-toggle empty' : 'json-toggle expanded';
     const keyPart = key !== null ? `<span class="json-key">"${escapeHtml(key)}"</span>: ` : '';
     
     if (isEmpty) {
@@ -886,10 +901,10 @@ function buildJsonLines(obj, depth, key = null) {
     } else {
       const toggleId = 'toggle_' + Math.random().toString(36).substr(2, 9);
       lines.push({ 
-        html: `${indent}${keyPart}<span class="${toggleClass}" data-toggle-id="${toggleId}"></span>[`,
+        html: `${indent}${keyPart}[`,
         hidden: false,
         toggleId: toggleId,
-        isToggleLine: true
+        toggleSymbol: '▼'
       });
       
       obj.forEach((item, idx) => {
@@ -899,7 +914,8 @@ function buildJsonLines(obj, depth, key = null) {
           lines.push({ 
             html: line.html + (isLast ? '' : ','),
             hidden: false,
-            toggleId: toggleId
+            toggleId: toggleId,
+            toggleSymbol: line.toggleSymbol
           });
         });
       });
@@ -910,7 +926,6 @@ function buildJsonLines(obj, depth, key = null) {
   else if (typeof obj === 'object') {
     const keys = Object.keys(obj);
     const isEmpty = keys.length === 0;
-    const toggleClass = isEmpty ? 'json-toggle empty' : 'json-toggle expanded';
     const keyPart = key !== null ? `<span class="json-key">"${escapeHtml(key)}"</span>: ` : '';
     
     if (isEmpty) {
@@ -918,10 +933,10 @@ function buildJsonLines(obj, depth, key = null) {
     } else {
       const toggleId = 'toggle_' + Math.random().toString(36).substr(2, 9);
       lines.push({ 
-        html: `${indent}${keyPart}<span class="${toggleClass}" data-toggle-id="${toggleId}"></span>{`,
+        html: `${indent}${keyPart}{`,
         hidden: false,
         toggleId: toggleId,
-        isToggleLine: true
+        toggleSymbol: '▼'
       });
       
       keys.forEach((k, idx) => {
@@ -931,7 +946,8 @@ function buildJsonLines(obj, depth, key = null) {
           lines.push({ 
             html: line.html + (isLast ? '' : ','),
             hidden: false,
-            toggleId: toggleId
+            toggleId: toggleId,
+            toggleSymbol: line.toggleSymbol
           });
         });
       });
@@ -945,131 +961,83 @@ function buildJsonLines(obj, depth, key = null) {
 
 function toggleJsonNode(toggleElement) {
   const toggleId = toggleElement.getAttribute('data-toggle-id');
-  const isExpanded = toggleElement.classList.contains('expanded');
-  const resultDiv = document.getElementById('result');
-  const allLines = Array.from(resultDiv.querySelectorAll('.json-line'));
+  const isExpanded = toggleElement.textContent === '▼';
+  const container = toggleElement.closest('.json-viewer');
+  const allLines = Array.from(container.querySelectorAll('.json-line'));
   
-  // Find the toggle line
-  let toggleLineIndex = -1;
-  allLines.forEach((line, idx) => {
-    if (line.querySelector(`[data-toggle-id="${toggleId}"]`)?.classList.contains('json-toggle')) {
-      if (line.querySelector(`[data-toggle-id="${toggleId}"]`) === toggleElement) {
-        toggleLineIndex = idx;
-      }
-    }
-  });
+  // Find the toggle line index
+  const toggleLine = toggleElement.closest('.json-line');
+  const toggleLineIndex = allLines.indexOf(toggleLine);
   
   if (toggleLineIndex === -1) return;
   
   if (isExpanded) {
-    // Collapse: hide child lines
-    toggleElement.classList.remove('expanded');
-    toggleElement.classList.add('collapsed');
+    // Collapse: hide child lines and show placeholder
+    toggleElement.textContent = '▶';
     
-    // Hide all lines until matching closing bracket at same indent level
-    let depth = 1;
-    const toggleLineIndent = (toggleElement.parentElement.textContent.match(/^\s*/)?.[0] || '').length;
-    
+    // Hide all child lines (lines with matching toggleId in data-parent-toggle)
     for (let i = toggleLineIndex + 1; i < allLines.length; i++) {
       const line = allLines[i];
-      const lineContent = line.querySelector('.json-content');
-      if (!lineContent) continue;
+      const parentToggle = line.getAttribute('data-parent-toggle');
       
-      const text = lineContent.textContent.trim();
-      const lineIndent = (lineContent.textContent.match(/^\s*/)?.[0] || '').length;
-      
-      if (lineIndent <= toggleLineIndent && (text.startsWith('}') || text.startsWith(']'))) {
-        depth--;
-        if (depth === 0) {
-          break;
-        }
-      }
-      
-      line.classList.add('json-collapsed-content');
-      
-      if ((text.includes('{') && !text.includes('{}')) || (text.includes('[') && !text.includes('[]'))) {
-        if (lineIndent > toggleLineIndent) depth++;
+      // If this line belongs to current toggle or is the closing bracket
+      if (parentToggle === toggleId) {
+        line.classList.add('json-collapsed-content');
+      } else if (!parentToggle) {
+        // No parent toggle means it's at the same or higher level - stop here
+        break;
       }
     }
     
     // Add placeholder
-    const placeholder = document.createElement('span');
-    placeholder.className = 'json-placeholder';
-    const openChar = toggleElement.nextSibling?.textContent?.trim();
-    placeholder.textContent = openChar === '[' ? ' [...]' : ' {...}';
-    toggleElement.parentElement.appendChild(placeholder);
+    const contentSpan = toggleElement.nextElementSibling;
+    if (contentSpan) {
+      const text = contentSpan.textContent.trim();
+      const openChar = text[text.length - 1];
+      const placeholder = document.createElement('span');
+      placeholder.className = 'json-placeholder';
+      placeholder.textContent = openChar === '[' ? ' [...]' : ' {...}';
+      contentSpan.appendChild(placeholder);
+    }
     
   } else {
-    // Expand: show child lines
-    toggleElement.classList.remove('collapsed');
-    toggleElement.classList.add('expanded');
+    // Expand: show child lines and remove placeholder
+    toggleElement.textContent = '▼';
     
     // Remove placeholder
-    const placeholder = toggleElement.parentElement.querySelector('.json-placeholder');
-    if (placeholder) placeholder.remove();
+    const contentSpan = toggleElement.nextElementSibling;
+    if (contentSpan) {
+      const placeholder = contentSpan.querySelector('.json-placeholder');
+      if (placeholder) placeholder.remove();
+    }
     
-    // Show only direct children (not nested collapsed content)
-    const toggleLineIndent = (toggleElement.parentElement.textContent.match(/^\s*/)?.[0] || '').length;
-    let depth = 1;
-    let foundNestedCollapsed = false;
-    
+    // Show direct children (but keep nested collapsed sections hidden)
     for (let i = toggleLineIndex + 1; i < allLines.length; i++) {
       const line = allLines[i];
-      const lineContent = line.querySelector('.json-content');
-      if (!lineContent) continue;
+      const parentToggle = line.getAttribute('data-parent-toggle');
       
-      const text = lineContent.textContent.trim();
-      const lineIndent = (lineContent.textContent.match(/^\s*/)?.[0] || '').length;
-      
-      // Check if this line is part of a nested collapsed section
-      const hasCollapsedToggle = lineContent.querySelector('.json-toggle.collapsed');
-      if (hasCollapsedToggle && lineIndent === toggleLineIndent + 2) {
-        foundNestedCollapsed = true;
-      }
-      
-      if (lineIndent <= toggleLineIndent && (text.startsWith('}') || text.startsWith(']'))) {
-        depth--;
-        if (depth === 0) {
+      if (parentToggle === toggleId) {
+        // Check if this line itself is a nested collapsed section
+        const nestedToggle = line.querySelector('.json-toggle');
+        if (nestedToggle && nestedToggle.textContent === '▶') {
+          // This is a collapsed nested section, show the line but not its children
           line.classList.remove('json-collapsed-content');
-          break;
+        } else {
+          // Normal child line
+          line.classList.remove('json-collapsed-content');
         }
-      }
-      
-      // Only show lines that aren't in a nested collapsed section
-      if (!foundNestedCollapsed || lineIndent <= toggleLineIndent + 2) {
-        line.classList.remove('json-collapsed-content');
-      }
-      
-      if (hasCollapsedToggle) {
-        // Skip nested collapsed content
-        const nestedToggleId = hasCollapsedToggle.getAttribute('data-toggle-id');
-        let nestedDepth = 1;
-        for (let j = i + 1; j < allLines.length; j++) {
-          const nestedLine = allLines[j];
-          const nestedContent = nestedLine.querySelector('.json-content')?.textContent?.trim() || '';
-          if (nestedContent.startsWith('}') || nestedContent.startsWith(']')) {
-            nestedDepth--;
-            if (nestedDepth === 0) {
-              i = j;
-              break;
-            }
-          }
-        }
-        foundNestedCollapsed = false;
-      }
-      
-      if ((text.includes('{') && !text.includes('{}')) || (text.includes('[') && !text.includes('[]'))) {
-        if (lineIndent > toggleLineIndent) depth++;
+      } else if (!parentToggle) {
+        break;
       }
     }
   }
   
-  renumberLines();
+  renumberLines(container);
 }
 
-function renumberLines() {
-  const resultDiv = document.getElementById('result');
-  const visibleLines = Array.from(resultDiv.querySelectorAll('.json-line:not(.json-collapsed-content)'));
+function renumberLines(container) {
+  if (!container) container = document.getElementById('result');
+  const visibleLines = Array.from(container.querySelectorAll('.json-line:not(.json-collapsed-content)'));
   visibleLines.forEach((line, idx) => {
     const lineNum = line.querySelector('.json-line-num');
     if (lineNum) lineNum.textContent = idx + 1;
@@ -1084,16 +1052,20 @@ function escapeHtml(str) {
 
 function expandAllResult() {
   const result = document.getElementById('result');
-  result.querySelectorAll('.json-toggle.collapsed').forEach(toggle => {
-    toggle.click();
+  result.querySelectorAll('.json-toggle').forEach(toggle => {
+    if (toggle.textContent === '▶') {
+      toggle.click();
+    }
   });
   showButtonFeedback(event.target, '✓ Expanded', '#276749');
 }
 
 function collapseAllResult() {
   const result = document.getElementById('result');
-  result.querySelectorAll('.json-toggle.expanded').forEach(toggle => {
-    toggle.click();
+  result.querySelectorAll('.json-toggle').forEach(toggle => {
+    if (toggle.textContent === '▼') {
+      toggle.click();
+    }
   });
   showButtonFeedback(event.target, '✓ Collapsed', '#276749');
 }
