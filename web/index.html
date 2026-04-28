@@ -215,6 +215,9 @@ const MAX_HISTORY = 10;
 // Command enable/disable status from server config
 let commandConfig = {};
 
+// Last raw JSON response text (preserved for re-render without parsing artifacts)
+let lastRawResult = null;
+
 function getCachedToken() {
   return localStorage.getItem(TOKEN_CACHE_KEY) || '';
 }
@@ -836,12 +839,12 @@ function renderJsonTree(json, targetId) {
     
     let html = '';
     lines.forEach((line, idx) => {
-      html += `<div class="json-line ${line.hidden ? 'json-collapsed-content' : ''}" ${line.toggleId ? `data-parent-toggle="${line.toggleId}"` : ''}>`;
+      html += `<div class="json-line ${line.hidden ? 'json-collapsed-content' : ''}" ${line.parentToggleId ? `data-parent-toggle="${line.parentToggleId}"` : ''}>`;
       html += `<span class="json-line-num">${idx + 1}</span>`;
       
       // Toggle column - only show triangle on toggle lines
       if (line.toggleSymbol) {
-        html += `<span class="json-toggle" data-toggle-id="${line.toggleId}">${line.toggleSymbol}</span>`;
+        html += `<span class="json-toggle" data-toggle-id="${line.ownToggleId}">${line.toggleSymbol}</span>`;
       } else {
         html += `<span class="json-toggle"></span>`;
       }
@@ -890,9 +893,11 @@ function buildJsonLines(obj, depth, key = null) {
     lines.push({ html: content, hidden: false });
   }
   else if (typeof obj === 'string') {
+    // Use JSON.stringify to recover the raw JSON encoding (preserves \", \n, etc.)
+    const rawStr = JSON.stringify(obj).slice(1, -1);
     const content = key !== null
-      ? `${indent}<span class="json-key">"${escapeHtml(key)}"</span>: <span class="json-string">"${escapeHtml(obj)}"</span>`
-      : `${indent}<span class="json-string">"${escapeHtml(obj)}"</span>`;
+      ? `${indent}<span class="json-key">"${escapeHtml(key)}"</span>: <span class="json-string">"${escapeHtml(rawStr)}"</span>`
+      : `${indent}<span class="json-string">"${escapeHtml(rawStr)}"</span>`;
     lines.push({ html: content, hidden: false });
   }
   else if (Array.isArray(obj)) {
@@ -903,10 +908,11 @@ function buildJsonLines(obj, depth, key = null) {
       lines.push({ html: `${indent}${keyPart}[]`, hidden: false });
     } else {
       const toggleId = 'toggle_' + Math.random().toString(36).substr(2, 9);
+      // Opening bracket - this is the toggle itself
       lines.push({ 
         html: `${indent}${keyPart}[`,
         hidden: false,
-        toggleId: toggleId,
+        ownToggleId: toggleId,
         toggleSymbol: '▼'
       });
       
@@ -921,13 +927,15 @@ function buildJsonLines(obj, depth, key = null) {
           lines.push({ 
             html: line.html + (needsComma ? ',' : ''),
             hidden: false,
-            toggleId: toggleId,
+            parentToggleId: toggleId,
+            ownToggleId: line.ownToggleId,
             toggleSymbol: line.toggleSymbol
           });
         });
       });
       
-      lines.push({ html: `${indent}]`, hidden: false, toggleId: toggleId });
+      // Closing bracket - child of this toggle
+      lines.push({ html: `${indent}]`, hidden: false, parentToggleId: toggleId });
     }
   }
   else if (typeof obj === 'object') {
@@ -939,10 +947,11 @@ function buildJsonLines(obj, depth, key = null) {
       lines.push({ html: `${indent}${keyPart}{}`, hidden: false });
     } else {
       const toggleId = 'toggle_' + Math.random().toString(36).substr(2, 9);
+      // Opening bracket - this is the toggle itself
       lines.push({ 
         html: `${indent}${keyPart}{`,
         hidden: false,
-        toggleId: toggleId,
+        ownToggleId: toggleId,
         toggleSymbol: '▼'
       });
       
@@ -957,13 +966,15 @@ function buildJsonLines(obj, depth, key = null) {
           lines.push({ 
             html: line.html + (needsComma ? ',' : ''),
             hidden: false,
-            toggleId: toggleId,
+            parentToggleId: toggleId,
+            ownToggleId: line.ownToggleId,
             toggleSymbol: line.toggleSymbol
           });
         });
       });
       
-      lines.push({ html: `${indent}}`, hidden: false, toggleId: toggleId });
+      // Closing bracket - child of this toggle
+      lines.push({ html: `${indent}}`, hidden: false, parentToggleId: toggleId });
     }
   }
   
@@ -976,31 +987,30 @@ function toggleJsonNode(toggleElement) {
   const container = toggleElement.closest('.json-viewer');
   const allLines = Array.from(container.querySelectorAll('.json-line'));
   
-  // Find the toggle line index
   const toggleLine = toggleElement.closest('.json-line');
   const toggleLineIndex = allLines.indexOf(toggleLine);
-  
   if (toggleLineIndex === -1) return;
   
   if (isExpanded) {
-    // Collapse: hide child lines and show placeholder
+    // --- COLLAPSE ---
     toggleElement.textContent = '▶';
     
-    // Hide all child lines (lines with matching toggleId in data-parent-toggle)
+    // Hide all descendants. Use inScope to track which toggleIds are inside
+    // this block (parents always appear before their children in DOM order).
+    const inScope = new Set([toggleId]);
     for (let i = toggleLineIndex + 1; i < allLines.length; i++) {
       const line = allLines[i];
       const parentToggle = line.getAttribute('data-parent-toggle');
+      if (!parentToggle || !inScope.has(parentToggle)) break;
       
-      // If this line belongs to current toggle or is the closing bracket
-      if (parentToggle === toggleId) {
-        line.classList.add('json-collapsed-content');
-      } else if (!parentToggle) {
-        // No parent toggle means it's at the same or higher level - stop here
-        break;
-      }
+      line.classList.add('json-collapsed-content');
+      
+      // Add this line's own toggle to scope so its children are also in range
+      const lineToggle = line.querySelector('.json-toggle[data-toggle-id]');
+      if (lineToggle) inScope.add(lineToggle.getAttribute('data-toggle-id'));
     }
     
-    // Add placeholder
+    // Add placeholder text next to the opening bracket
     const contentSpan = toggleElement.nextElementSibling;
     if (contentSpan) {
       const text = contentSpan.textContent.trim();
@@ -1012,7 +1022,7 @@ function toggleJsonNode(toggleElement) {
     }
     
   } else {
-    // Expand: show child lines and remove placeholder
+    // --- EXPAND ---
     toggleElement.textContent = '▼';
     
     // Remove placeholder
@@ -1022,24 +1032,29 @@ function toggleJsonNode(toggleElement) {
       if (placeholder) placeholder.remove();
     }
     
-    // Show direct children (but keep nested collapsed sections hidden)
+    // Show descendants, respecting nested collapse states.
+    // expandedScope: toggleIds whose direct children should be visible.
+    // inScope: all toggleIds inside this block (to detect when we've left the block).
+    const expandedScope = new Set([toggleId]);
+    const inScope = new Set([toggleId]);
     for (let i = toggleLineIndex + 1; i < allLines.length; i++) {
       const line = allLines[i];
       const parentToggle = line.getAttribute('data-parent-toggle');
+      if (!parentToggle || !inScope.has(parentToggle)) break;
       
-      if (parentToggle === toggleId) {
-        // Check if this line itself is a nested collapsed section
-        const nestedToggle = line.querySelector('.json-toggle');
-        if (nestedToggle && nestedToggle.textContent === '▶') {
-          // This is a collapsed nested section, show the line but not its children
-          line.classList.remove('json-collapsed-content');
-        } else {
-          // Normal child line
-          line.classList.remove('json-collapsed-content');
+      const lineToggle = line.querySelector('.json-toggle[data-toggle-id]');
+      const lineOwnToggleId = lineToggle ? lineToggle.getAttribute('data-toggle-id') : null;
+      if (lineOwnToggleId) inScope.add(lineOwnToggleId);
+      
+      if (expandedScope.has(parentToggle)) {
+        // Direct child of a visible (expanded) parent – show it
+        line.classList.remove('json-collapsed-content');
+        // If this line has an expanded toggle, its children are also visible
+        if (lineToggle && lineToggle.textContent === '▼') {
+          expandedScope.add(lineOwnToggleId);
         }
-      } else if (!parentToggle) {
-        break;
       }
+      // else: parent is collapsed – leave line hidden, managed by its own toggle
     }
   }
   
@@ -1144,16 +1159,12 @@ function collapseAllResult() {
 }
 
 function formatResultJson() {
-  // Legacy support - now uses tree viewer
-  const resultBox = document.getElementById('result');
-  const text = resultBox.textContent?.trim() || resultBox.innerText?.trim() || '';
-  
-  if (text === '— waiting —' || !text) {
+  // Re-render from the saved raw text (preserves original JSON encoding)
+  if (!lastRawResult || lastRawResult === '— waiting —') {
     showButtonFeedback(event.target, '⚠ Empty', '#744210');
     return;
   }
-  
-  renderJsonTree(text, 'result');
+  renderJsonTree(lastRawResult, 'result');
   showButtonFeedback(event.target, '✓ Done', '#276749');
 }
 
@@ -1213,14 +1224,32 @@ async function runCmd() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
-    const data = await r.json();
+    
+    // Get raw text first to preserve original formatting
+    const rawText = await r.text();
+    
+    // Parse for logic checks only
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseError) {
+      // If parse fails, show raw text as error
+      box.classList.add('err');
+      box.innerHTML = '<div class="json-content err">' + escapeHtml(rawText) + '</div>';
+      saveHistory(cmd, args, false, rawText);
+      renderHistory(cmd);
+      return;
+    }
     
     // Handle new JSON format: check "code" instead of "ok"
     const isSuccess = data.code === 0;
-    const outputText = JSON.stringify(data, null, 2);
     
-    // Render JSON tree viewer
-    renderJsonTree(data, 'result');
+    // Use raw text for display and history to preserve original format
+    const outputText = rawText;
+    lastRawResult = rawText;
+    
+    // Render JSON tree viewer using raw text
+    renderJsonTree(rawText, 'result');
     
     // Save token to localStorage when authenticated command succeeds
     // This enables auto-fill for debugging convenience
