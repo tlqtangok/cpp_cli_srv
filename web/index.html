@@ -43,12 +43,7 @@
     color: #a0aec0; font-size: .75rem; cursor: pointer; transition: all .15s; }
   .os-btn.active { background: #2b6cb0; border-color: #63b3ed; color: #fff; }
   .os-btn:hover:not(.active) { background: #2d3748; }
-  .view-toggle { display: flex; gap: 4px; }
-  .view-btn { padding: 4px 12px; background: #1a202c; border: 1px solid #2d3748; border-radius: 4px;
-    color: #a0aec0; font-size: .75rem; cursor: pointer; transition: all .15s; }
-  .view-btn.active { background: #2b6cb0; border-color: #63b3ed; color: #fff; }
-  .view-btn:hover:not(.active) { background: #2d3748; }
-  .tag { font-size: .7rem; padding: 2px 7px; border-radius: 10px; background: #2d3748; color: #a0aec0; }
+  .tag{ font-size: .7rem; padding: 2px 7px; border-radius: 10px; background: #2d3748; color: #a0aec0; }
 
   /* History panel - positioned at bottom */
   .history-section { 
@@ -95,29 +90,50 @@
   .json-btn:hover { background: #4a5568; color: #e2e8f0; }
   .json-btn:active { background: #2b6cb0; }
   
-  /* JSON Tree Viewer */
-  .json-viewer { background: #1a202c; border: 1px solid #2d3748; border-radius: 8px;
-    font-family: 'Consolas', monospace; font-size: .85rem; overflow: auto; min-height: 180px;
-    padding: 14px; }
-  .json-viewer.err { border-color: #fc8181; color: #fc8181; }
-  .json-line { display: flex; line-height: 1.6; align-items: flex-start; }
-  .json-line-num { color: #4a5568; min-width: 40px; text-align: right; padding-right: 8px;
-    user-select: none; flex-shrink: 0; }
-  .json-toggle { width: 20px; text-align: left; cursor: pointer; color: #a0aec0;
-    user-select: none; flex-shrink: 0; font-size: .85rem; line-height: 1.6; }
-  .json-toggle:hover { color: #e2e8f0; }
-  .json-content { flex: 1; white-space: pre; color: #68d391; }
-  .json-content.err { color: #fc8181; }
-  .json-key { color: #63b3ed; }
-  .json-string { color: #68d391; }
-  .json-number { color: #f6ad55; }
-  .json-boolean { color: #9f7aea; }
-  .json-null { color: #718096; }
-  .json-collapsed-content { display: none; }
-  .json-placeholder { color: #718096; font-style: italic; }
 
 
+/* CodeMirror cli-dark theme */
+.cm-s-cli-dark.CodeMirror {
+  background: #1a202c; color: #e2e8f0;
+  font-family: 'Consolas','Monaco',monospace; font-size: .85rem;
+  min-height: 180px; border: 1px solid #2d3748; border-radius: 8px;
+  height: auto;
+}
+.cm-s-cli-dark .CodeMirror-scroll { min-height: 180px; }
+.cm-s-cli-dark .CodeMirror-gutters { background: #161c27; border-right: 1px solid #2d3748; }
+.cm-s-cli-dark .CodeMirror-linenumber { color: #4a5568; }
+.cm-s-cli-dark .CodeMirror-cursor { border-left: 2px solid #63b3ed; }
+.cm-s-cli-dark .CodeMirror-selected { background: #2d4a6e; }
+.cm-s-cli-dark .CodeMirror-foldgutter { width: 1em; }
+.cm-s-cli-dark .CodeMirror-foldgutter-open,
+.cm-s-cli-dark .CodeMirror-foldgutter-folded { cursor: pointer; }
+.cm-s-cli-dark .CodeMirror-foldgutter-open:after   { content: "▾"; color: #a0aec0; }
+.cm-s-cli-dark .CodeMirror-foldgutter-folded:after { content: "▸"; color: #a0aec0; }
+.cm-s-cli-dark .CodeMirror-foldgutter-open:hover:after,
+.cm-s-cli-dark .CodeMirror-foldgutter-folded:hover:after { color: #e2e8f0; }
+.cm-s-cli-dark .CodeMirror-foldmarker {
+  color: #718096; font-style: italic; background: #2d3748; border-radius: 3px; padding: 0 3px; cursor: pointer;
+}
+.cm-s-cli-dark .cm-string   { color: #68d391; }
+.cm-s-cli-dark .cm-number   { color: #f6ad55; }
+.cm-s-cli-dark .cm-atom     { color: #9f7aea; }
+.cm-s-cli-dark .cm-keyword  { color: #9f7aea; }
+.cm-s-cli-dark .cm-property { color: #63b3ed; }
+.cm-s-cli-dark .cm-operator,
+.cm-s-cli-dark .cm-punctuation { color: #e2e8f0; }
+.cm-s-cli-dark .cm-error { color: #fc8181; }
+/* result editor: slightly larger min-height */
+#resultEditorDiv .CodeMirror { min-height: 300px; }
+#resultEditorDiv .CodeMirror-scroll { min-height: 300px; }
 </style>
+<!-- CodeMirror 5 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/brace-fold.min.js"></script>
 </head>
 <body>
 <header>
@@ -138,20 +154,17 @@
     </div>
     <div>
       <div class="curl-label">
-        <label>Args (JSON) <span style="color:#718096;font-size:.75rem">(token auto-filled from last success for debugging)</span></label>
+        <label>Args (JSON) <span style="color:#718096;font-size:.75rem">(token auto-filled from last success)</span></label>
         <div style="display:flex;gap:8px;">
-          <div class="view-toggle">
-            <button class="view-btn active" id="argsTextBtn" onclick="switchArgsView('text')">📝 Text</button>
-            <button class="view-btn" id="argsTreeBtn" onclick="switchArgsView('tree')">🌳 Tree</button>
+          <div class="json-tools">
+            <button class="json-btn" onclick="formatArgsJson(event)">{ } Format</button>
+            <button class="json-btn" onclick="cmFoldAll(argsEditor)">📁 Fold All</button>
+            <button class="json-btn" onclick="cmUnfoldAll(argsEditor)">📂 Unfold All</button>
           </div>
-          <div class="json-tools" id="argsTreeTools" style="display:none;">
-            <button class="json-btn" id="toggleArgsBtn" onclick="toggleAllArgs()">📁 Collapse All</button>
-          </div>
-          <button class="copy-btn" onclick="copyArgs()">📋 Copy</button>
+          <button class="copy-btn" onclick="copyArgs(event)">📋 Copy</button>
         </div>
       </div>
-      <textarea id="argsInput" rows="8" placeholder='{"text": "hello"}' oninput="updateCurl()"></textarea>
-      <div class="json-viewer" id="argsTree" style="display:none;"></div>
+      <div id="argsEditorDiv"></div>
     </div>
     <div>
       <div class="curl-label">
@@ -174,12 +187,13 @@
       <label>Result</label>
       <div style="display:flex;gap:8px;">
         <div class="json-tools">
-          <button class="json-btn" id="toggleResultBtn" onclick="toggleAllResult()">📁 Collapse All</button>
+          <button class="json-btn" onclick="cmFoldAll(resultEditor)">📁 Fold All</button>
+          <button class="json-btn" onclick="cmUnfoldAll(resultEditor)">📂 Unfold All</button>
         </div>
-        <button class="copy-btn" onclick="copyResult()">📋 Copy</button>
+        <button class="copy-btn" onclick="copyResult(event)">📋 Copy</button>
       </div>
     </div>
-    <div class="json-viewer" id="result">— waiting —</div>
+    <div id="resultEditorDiv"></div>
     <!-- History panel -->
     <div class="history-section" id="historySection">
       <div class="history-header" onclick="toggleHistory()" style="cursor:pointer;">
@@ -217,6 +231,8 @@ let commandConfig = {};
 
 // Last raw JSON response text (preserved for re-render without parsing artifacts)
 let lastRawResult = null;
+let argsEditor = null;
+let resultEditor = null;
 
 function getCachedToken() {
   return localStorage.getItem(TOKEN_CACHE_KEY) || '';
@@ -304,26 +320,13 @@ function renderHistory(cmd) {
 }
 
 function loadHistoryEntry(entry) {
-  document.getElementById('argsInput').value = JSON.stringify(entry.args, null, 2);
+  argsEditor.setValue(JSON.stringify(entry.args, null, 2));
   updateCurl();
   
   // Restore output if available
   if (entry.output) {
-    renderJsonTree(entry.output, 'result');
-    const box = document.getElementById('result');
-    if (!entry.success) {
-      box.classList.add('err');
-    }
+    showResult(entry.output);
   }
-  
-  // Switch Args to text view when loading history
-  const argsInput = document.getElementById('argsInput');
-  const argsTree = document.getElementById('argsTree');
-  argsInput.style.display = 'block';
-  argsTree.style.display = 'none';
-  document.getElementById('argsTextBtn').classList.add('active');
-  document.getElementById('argsTreeBtn').classList.remove('active');
-  document.getElementById('argsTreeTools').style.display = 'none';
 }
 
 // Toggle history list visibility
@@ -338,64 +341,6 @@ function toggleHistory() {
     list.classList.add('collapsed');
     icon.textContent = '▶';
   }
-}
-
-// Switch Args view between text and tree
-function switchArgsView(mode) {
-  const argsInput = document.getElementById('argsInput');
-  const argsTree = document.getElementById('argsTree');
-  const textBtn = document.getElementById('argsTextBtn');
-  const treeBtn = document.getElementById('argsTreeBtn');
-  const treeTools = document.getElementById('argsTreeTools');
-  
-  if (mode === 'tree') {
-    // Parse and render JSON tree
-    try {
-      const text = argsInput.value.trim();
-      if (!text) {
-        alert('Please enter JSON content first');
-        return;
-      }
-      const json = JSON.parse(text);
-      renderJsonTree(json, 'argsTree');
-      
-      argsInput.style.display = 'none';
-      argsTree.style.display = 'block';
-      textBtn.classList.remove('active');
-      treeBtn.classList.add('active');
-      treeTools.style.display = 'flex';
-    } catch (e) {
-      alert('Invalid JSON: ' + e.message);
-    }
-  } else {
-    // Switch back to text mode
-    argsInput.style.display = 'block';
-    argsTree.style.display = 'none';
-    textBtn.classList.add('active');
-    treeBtn.classList.remove('active');
-    treeTools.style.display = 'none';
-  }
-}
-
-// Expand/Collapse all nodes in Args tree
-function expandAllArgs() {
-  const container = document.getElementById('argsTree');
-  const toggles = container.querySelectorAll('.json-toggle');
-  toggles.forEach(toggle => {
-    if (toggle.textContent === '▶') {
-      toggle.click();
-    }
-  });
-}
-
-function collapseAllArgs() {
-  const container = document.getElementById('argsTree');
-  const toggles = container.querySelectorAll('.json-toggle');
-  toggles.forEach(toggle => {
-    if (toggle.textContent === '▼') {
-      toggle.click();
-    }
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -501,9 +446,35 @@ async function loadVersion() {
 }
 
 async function initializeGUI() {
-  await loadConfig();   // read-only: sets commandConfig, never writes to server
+  initEditors();       // must be first so editors exist before any other init
+  await loadConfig();
   await loadSchema();
   await loadVersion();
+}
+
+function initEditors() {
+  const cmOptions = {
+    mode: { name: 'javascript', json: true },
+    theme: 'cli-dark',
+    lineNumbers: true,
+    foldGutter: true,
+    gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+    tabSize: 2,
+    indentWithTabs: false,
+    lineWrapping: true,
+    foldOptions: { rangeFinder: CodeMirror.fold.brace }
+  };
+  argsEditor = CodeMirror(document.getElementById('argsEditorDiv'), {
+    ...cmOptions,
+    value: '',
+    extraKeys: { 'Ctrl-Enter': () => runCmd() }
+  });
+  argsEditor.on('change', () => updateCurl());
+  resultEditor = CodeMirror(document.getElementById('resultEditorDiv'), {
+    ...cmOptions,
+    value: '— waiting —',
+    readOnly: true
+  });
 }
 
 function fillCmd(c) {
@@ -530,7 +501,7 @@ function fillCmd(c) {
     }
   }
   
-  document.getElementById('argsInput').value = JSON.stringify(sample, null, 2);
+  argsEditor.setValue(JSON.stringify(sample, null, 2));
   document.querySelectorAll('.cmd-btn').forEach(b => b.classList.toggle('active', b.textContent === c.name));
   
   // Update Run button state based on config
@@ -571,7 +542,7 @@ function switchOS(os) {
 
 function updateCurl() {
   const cmd = document.getElementById('cmdInput').value.trim();
-  const args = document.getElementById('argsInput').value.trim();
+  const args = argsEditor ? argsEditor.getValue().trim() : '';
   const curlBox = document.getElementById('curlBox');
   
   if (!cmd) {
@@ -687,73 +658,26 @@ function fallbackCopy(text, btn, originalText) {
 // Copy buttons for Args and Result
 // ---------------------------------------------------------------------------
 
-function copyArgs() {
-  const argsInput = document.getElementById('argsInput');
-  const argsTree = document.getElementById('argsTree');
-  const btn = event.target;
+function copyArgs(e) {
+  const btn = e ? e.target : event.target;
   const originalText = btn.textContent;
-  
-  let text = '';
-  
-  // Check which view is active
-  if (argsInput.style.display !== 'none') {
-    // Text view
-    text = argsInput.value.trim();
-  } else {
-    // Tree view - extract from tree
-    const lines = Array.from(argsTree.querySelectorAll('.json-line:not(.json-collapsed-content) .json-content'));
-    text = lines.map(line => line.textContent).join('\n').trim();
-  }
-  
+  const text = argsEditor.getValue().trim();
   if (!text) {
-    btn.textContent = '⚠ Empty';
-    btn.style.background = '#744210';
-    setTimeout(() => {
-      btn.textContent = originalText;
-      btn.style.background = '';
-    }, 2000);
+    showButtonFeedback(btn, '⚠ Empty', '#744210');
     return;
   }
-  
-  // Try to format as JSON before copying
-  try {
-    const parsed = JSON.parse(text);
-    const formatted = JSON.stringify(parsed, null, 2);
-    copyToClipboard(formatted, btn, originalText);
-  } catch(e) {
-    // Not valid JSON, copy as-is
-    copyToClipboard(text, btn, originalText);
-  }
+  copyToClipboard(text, btn, originalText);
 }
 
-function copyResult() {
-  const resultBox = document.getElementById('result');
-  const btn = event.target;
+function copyResult(e) {
+  const btn = e ? e.target : event.target;
   const originalText = btn.textContent;
-  
-  // Get all visible JSON content, excluding line numbers
-  const lines = Array.from(resultBox.querySelectorAll('.json-line:not(.json-collapsed-content) .json-content'));
-  const text = lines.map(line => line.textContent).join('\n').trim();
-  
-  if (text === '— waiting —' || !text) {
-    btn.textContent = '⚠ Empty';
-    btn.style.background = '#744210';
-    setTimeout(() => {
-      btn.textContent = originalText;
-      btn.style.background = '';
-    }, 2000);
+  const text = resultEditor.getValue().trim();
+  if (!text || text === '— waiting —') {
+    showButtonFeedback(btn, '⚠ Empty', '#744210');
     return;
   }
-  
-  // Try to format as JSON before copying
-  try {
-    const parsed = JSON.parse(text);
-    const formatted = JSON.stringify(parsed, null, 2);
-    copyToClipboard(formatted, btn, originalText);
-  } catch(e) {
-    // Not valid JSON, copy as-is
-    copyToClipboard(text, btn, originalText);
-  }
+  copyToClipboard(text, btn, originalText);
 }
 
 function copyToClipboard(text, btn, originalText) {
@@ -780,397 +704,50 @@ function copyToClipboard(text, btn, originalText) {
 // JSON Formatting Functions
 // ---------------------------------------------------------------------------
 
-function formatArgsJson() {
-  const argsInput = document.getElementById('argsInput');
-  const text = argsInput.value.trim();
-  const btn = event.target;
-  
-  if (!text) {
-    showButtonFeedback(btn, '⚠ Empty', '#744210');
-    return;
-  }
-  
+function formatArgsJson(e) {
+  const btn = e ? e.target : event.target;
+  const text = argsEditor.getValue().trim();
+  if (!text) { showButtonFeedback(btn, '⚠ Empty', '#744210'); return; }
   try {
-    const parsed = JSON.parse(text);
-    argsInput.value = JSON.stringify(parsed, null, 2);
+    argsEditor.setValue(JSON.stringify(JSON.parse(text), null, 2));
     updateCurl();
     showButtonFeedback(btn, '✓ Done', '#276749');
-  } catch (e) {
-    showButtonFeedback(btn, '✗ Invalid', '#742a2a');
-  }
-}
-
-function collapseArgsJson() {
-  const argsInput = document.getElementById('argsInput');
-  const text = argsInput.value.trim();
-  const btn = event.target;
-  
-  if (!text) {
-    showButtonFeedback(btn, '⚠ Empty', '#744210');
-    return;
-  }
-  
-  try {
-    const parsed = JSON.parse(text);
-    argsInput.value = JSON.stringify(parsed);
-    updateCurl();
-    showButtonFeedback(btn, '✓ Done', '#276749');
-  } catch (e) {
+  } catch (ex) {
     showButtonFeedback(btn, '✗ Invalid', '#742a2a');
   }
 }
 
 // ---------------------------------------------------------------------------
-// JSON Tree Viewer - Interactive collapsible JSON with line numbers
+// CodeMirror helpers
 // ---------------------------------------------------------------------------
 
-function renderJsonTree(json, targetId) {
-  const target = document.getElementById(targetId);
-  
-  if (!json || json === '— waiting —') {
-    target.innerHTML = '<div class="json-content">' + (json || '— waiting —') + '</div>';
-    target.classList.remove('err');
-    return;
-  }
-  
+function cmFoldAll(cm) {
+  if (!cm) return;
+  cm.operation(() => {
+    for (let i = cm.lineCount() - 1; i >= 0; i--) {
+      cm.foldCode({ line: i, ch: 0 }, null, 'fold');
+    }
+  });
+}
+
+function cmUnfoldAll(cm) {
+  if (!cm) return;
+  cm.operation(() => {
+    for (let i = 0; i < cm.lineCount(); i++) {
+      cm.foldCode({ line: i, ch: 0 }, null, 'unfold');
+    }
+  });
+}
+
+function showResult(rawText) {
+  lastRawResult = rawText;
+  let display = rawText;
   try {
-    const parsed = typeof json === 'string' ? JSON.parse(json) : json;
-    const lines = buildJsonLines(parsed, 0);
-    
-    let html = '';
-    lines.forEach((line, idx) => {
-      html += `<div class="json-line ${line.hidden ? 'json-collapsed-content' : ''}" ${line.parentToggleId ? `data-parent-toggle="${line.parentToggleId}"` : ''}>`;
-      html += `<span class="json-line-num">${idx + 1}</span>`;
-      
-      // Toggle column - only show triangle on toggle lines
-      if (line.toggleSymbol) {
-        html += `<span class="json-toggle" data-toggle-id="${line.ownToggleId}">${line.toggleSymbol}</span>`;
-      } else {
-        html += `<span class="json-toggle"></span>`;
-      }
-      
-      html += `<span class="json-content">${line.html}</span>`;
-      html += `</div>`;
-    });
-    
-    target.innerHTML = html;
-    target.classList.remove('err');
-    
-    // Attach toggle event listeners
-    target.querySelectorAll('.json-toggle[data-toggle-id]').forEach(toggle => {
-      toggle.addEventListener('click', function(e) {
-        e.stopPropagation();
-        toggleJsonNode(this);
-      });
-    });
-    
-  } catch (e) {
-    target.innerHTML = '<div class="json-content err">' + json + '</div>';
-    target.classList.add('err');
-  }
-}
-
-function buildJsonLines(obj, depth, key = null) {
-  const indent = '  '.repeat(depth);
-  const lines = [];
-  
-  if (obj === null) {
-    const content = key !== null 
-      ? `${indent}<span class="json-key">"${escapeHtml(key)}"</span>: <span class="json-null">null</span>`
-      : `${indent}<span class="json-null">null</span>`;
-    lines.push({ html: content, hidden: false });
-  } 
-  else if (typeof obj === 'boolean') {
-    const content = key !== null
-      ? `${indent}<span class="json-key">"${escapeHtml(key)}"</span>: <span class="json-boolean">${obj}</span>`
-      : `${indent}<span class="json-boolean">${obj}</span>`;
-    lines.push({ html: content, hidden: false });
-  }
-  else if (typeof obj === 'number') {
-    const content = key !== null
-      ? `${indent}<span class="json-key">"${escapeHtml(key)}"</span>: <span class="json-number">${obj}</span>`
-      : `${indent}<span class="json-number">${obj}</span>`;
-    lines.push({ html: content, hidden: false });
-  }
-  else if (typeof obj === 'string') {
-    // Use JSON.stringify to recover the raw JSON encoding (preserves \", \n, etc.)
-    const rawStr = JSON.stringify(obj).slice(1, -1);
-    const content = key !== null
-      ? `${indent}<span class="json-key">"${escapeHtml(key)}"</span>: <span class="json-string">"${escapeHtml(rawStr)}"</span>`
-      : `${indent}<span class="json-string">"${escapeHtml(rawStr)}"</span>`;
-    lines.push({ html: content, hidden: false });
-  }
-  else if (Array.isArray(obj)) {
-    const isEmpty = obj.length === 0;
-    const keyPart = key !== null ? `<span class="json-key">"${escapeHtml(key)}"</span>: ` : '';
-    
-    if (isEmpty) {
-      lines.push({ html: `${indent}${keyPart}[]`, hidden: false });
-    } else {
-      const toggleId = 'toggle_' + Math.random().toString(36).substr(2, 9);
-      // Opening bracket - this is the toggle itself
-      lines.push({ 
-        html: `${indent}${keyPart}[`,
-        hidden: false,
-        ownToggleId: toggleId,
-        toggleSymbol: '▼'
-      });
-      
-      obj.forEach((item, idx) => {
-        const childLines = buildJsonLines(item, depth + 1);
-        const isLastItem = idx === obj.length - 1;
-        
-        childLines.forEach((line, lineIdx) => {
-          const isLastLineOfItem = lineIdx === childLines.length - 1;
-          const needsComma = !isLastItem && isLastLineOfItem;
-          
-          lines.push({ 
-            html: line.html + (needsComma ? ',' : ''),
-            hidden: false,
-            parentToggleId: toggleId,
-            ownToggleId: line.ownToggleId,
-            toggleSymbol: line.toggleSymbol
-          });
-        });
-      });
-      
-      // Closing bracket - child of this toggle
-      lines.push({ html: `${indent}]`, hidden: false, parentToggleId: toggleId });
-    }
-  }
-  else if (typeof obj === 'object') {
-    const keys = Object.keys(obj);
-    const isEmpty = keys.length === 0;
-    const keyPart = key !== null ? `<span class="json-key">"${escapeHtml(key)}"</span>: ` : '';
-    
-    if (isEmpty) {
-      lines.push({ html: `${indent}${keyPart}{}`, hidden: false });
-    } else {
-      const toggleId = 'toggle_' + Math.random().toString(36).substr(2, 9);
-      // Opening bracket - this is the toggle itself
-      lines.push({ 
-        html: `${indent}${keyPart}{`,
-        hidden: false,
-        ownToggleId: toggleId,
-        toggleSymbol: '▼'
-      });
-      
-      keys.forEach((k, idx) => {
-        const childLines = buildJsonLines(obj[k], depth + 1, k);
-        const isLastKey = idx === keys.length - 1;
-        
-        childLines.forEach((line, lineIdx) => {
-          const isLastLineOfKey = lineIdx === childLines.length - 1;
-          const needsComma = !isLastKey && isLastLineOfKey;
-          
-          lines.push({ 
-            html: line.html + (needsComma ? ',' : ''),
-            hidden: false,
-            parentToggleId: toggleId,
-            ownToggleId: line.ownToggleId,
-            toggleSymbol: line.toggleSymbol
-          });
-        });
-      });
-      
-      // Closing bracket - child of this toggle
-      lines.push({ html: `${indent}}`, hidden: false, parentToggleId: toggleId });
-    }
-  }
-  
-  return lines;
-}
-
-function toggleJsonNode(toggleElement) {
-  const toggleId = toggleElement.getAttribute('data-toggle-id');
-  const isExpanded = toggleElement.textContent === '▼';
-  const container = toggleElement.closest('.json-viewer');
-  const allLines = Array.from(container.querySelectorAll('.json-line'));
-  
-  const toggleLine = toggleElement.closest('.json-line');
-  const toggleLineIndex = allLines.indexOf(toggleLine);
-  if (toggleLineIndex === -1) return;
-  
-  if (isExpanded) {
-    // --- COLLAPSE ---
-    toggleElement.textContent = '▶';
-    
-    // Hide all descendants. Use inScope to track which toggleIds are inside
-    // this block (parents always appear before their children in DOM order).
-    const inScope = new Set([toggleId]);
-    for (let i = toggleLineIndex + 1; i < allLines.length; i++) {
-      const line = allLines[i];
-      const parentToggle = line.getAttribute('data-parent-toggle');
-      if (!parentToggle || !inScope.has(parentToggle)) break;
-      
-      line.classList.add('json-collapsed-content');
-      
-      // Add this line's own toggle to scope so its children are also in range
-      const lineToggle = line.querySelector('.json-toggle[data-toggle-id]');
-      if (lineToggle) inScope.add(lineToggle.getAttribute('data-toggle-id'));
-    }
-    
-    // Add placeholder text next to the opening bracket
-    const contentSpan = toggleElement.nextElementSibling;
-    if (contentSpan) {
-      const text = contentSpan.textContent.trim();
-      const openChar = text[text.length - 1];
-      const placeholder = document.createElement('span');
-      placeholder.className = 'json-placeholder';
-      placeholder.textContent = openChar === '[' ? ' [...]' : ' {...}';
-      contentSpan.appendChild(placeholder);
-    }
-    
-  } else {
-    // --- EXPAND ---
-    toggleElement.textContent = '▼';
-    
-    // Remove placeholder
-    const contentSpan = toggleElement.nextElementSibling;
-    if (contentSpan) {
-      const placeholder = contentSpan.querySelector('.json-placeholder');
-      if (placeholder) placeholder.remove();
-    }
-    
-    // Show descendants, respecting nested collapse states.
-    // expandedScope: toggleIds whose direct children should be visible.
-    // inScope: all toggleIds inside this block (to detect when we've left the block).
-    const expandedScope = new Set([toggleId]);
-    const inScope = new Set([toggleId]);
-    for (let i = toggleLineIndex + 1; i < allLines.length; i++) {
-      const line = allLines[i];
-      const parentToggle = line.getAttribute('data-parent-toggle');
-      if (!parentToggle || !inScope.has(parentToggle)) break;
-      
-      const lineToggle = line.querySelector('.json-toggle[data-toggle-id]');
-      const lineOwnToggleId = lineToggle ? lineToggle.getAttribute('data-toggle-id') : null;
-      if (lineOwnToggleId) inScope.add(lineOwnToggleId);
-      
-      if (expandedScope.has(parentToggle)) {
-        // Direct child of a visible (expanded) parent – show it
-        line.classList.remove('json-collapsed-content');
-        // If this line has an expanded toggle, its children are also visible
-        if (lineToggle && lineToggle.textContent === '▼') {
-          expandedScope.add(lineOwnToggleId);
-        }
-      }
-      // else: parent is collapsed – leave line hidden, managed by its own toggle
-    }
-  }
-  
-  renumberLines(container);
-}
-
-function renumberLines(container) {
-  if (!container) container = document.getElementById('result');
-  const visibleLines = Array.from(container.querySelectorAll('.json-line:not(.json-collapsed-content)'));
-  visibleLines.forEach((line, idx) => {
-    const lineNum = line.querySelector('.json-line-num');
-    if (lineNum) lineNum.textContent = idx + 1;
-  });
-}
-
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-function toggleAllResult() {
-  const result = document.getElementById('result');
-  const btn = document.getElementById('toggleResultBtn');
-  const toggles = Array.from(result.querySelectorAll('.json-toggle[data-toggle-id]'));
-  
-  if (toggles.length === 0) return;
-  
-  // Check current state - if any are expanded, collapse all; otherwise expand all
-  const hasExpanded = toggles.some(t => t.textContent === '▼');
-  
-  if (hasExpanded) {
-    // Collapse all
-    toggles.forEach(toggle => {
-      if (toggle.textContent === '▼') {
-        toggle.click();
-      }
-    });
-    btn.textContent = '📂 Expand All';
-    showButtonFeedback(btn, '✓ Collapsed', '#276749');
-  } else {
-    // Expand all
-    toggles.forEach(toggle => {
-      if (toggle.textContent === '▶') {
-        toggle.click();
-      }
-    });
-    btn.textContent = '📁 Collapse All';
-    showButtonFeedback(btn, '✓ Expanded', '#276749');
-  }
-}
-
-function toggleAllArgs() {
-  const argsTree = document.getElementById('argsTree');
-  const btn = document.getElementById('toggleArgsBtn');
-  const toggles = Array.from(argsTree.querySelectorAll('.json-toggle[data-toggle-id]'));
-  
-  if (toggles.length === 0) return;
-  
-  // Check current state
-  const hasExpanded = toggles.some(t => t.textContent === '▼');
-  
-  if (hasExpanded) {
-    // Collapse all
-    toggles.forEach(toggle => {
-      if (toggle.textContent === '▼') {
-        toggle.click();
-      }
-    });
-    btn.textContent = '📂 Expand All';
-    showButtonFeedback(btn, '✓ Collapsed', '#276749');
-  } else {
-    // Expand all
-    toggles.forEach(toggle => {
-      if (toggle.textContent === '▶') {
-        toggle.click();
-      }
-    });
-    btn.textContent = '📁 Collapse All';
-    showButtonFeedback(btn, '✓ Expanded', '#276749');
-  }
-}
-
-function expandAllResult() {
-  const result = document.getElementById('result');
-  result.querySelectorAll('.json-toggle').forEach(toggle => {
-    if (toggle.textContent === '▶') {
-      toggle.click();
-    }
-  });
-  showButtonFeedback(event.target, '✓ Expanded', '#276749');
-}
-
-function collapseAllResult() {
-  const result = document.getElementById('result');
-  result.querySelectorAll('.json-toggle').forEach(toggle => {
-    if (toggle.textContent === '▼') {
-      toggle.click();
-    }
-  });
-  showButtonFeedback(event.target, '✓ Collapsed', '#276749');
-}
-
-function formatResultJson() {
-  // Re-render from the saved raw text (preserves original JSON encoding)
-  if (!lastRawResult || lastRawResult === '— waiting —') {
-    showButtonFeedback(event.target, '⚠ Empty', '#744210');
-    return;
-  }
-  renderJsonTree(lastRawResult, 'result');
-  showButtonFeedback(event.target, '✓ Done', '#276749');
-}
-
-function collapseResultJson() {
-  // Legacy support
-  formatResultJson();
+    display = JSON.stringify(JSON.parse(rawText), null, 2);
+  } catch (e) { /* show raw if not valid JSON */ }
+  resultEditor.setOption('readOnly', false);
+  resultEditor.setValue(display);
+  resultEditor.setOption('readOnly', true);
 }
 
 function showButtonFeedback(btn, text, bgColor) {
@@ -1190,17 +767,19 @@ function showButtonFeedback(btn, text, bgColor) {
 
 async function runCmd() {
   const cmd  = document.getElementById('cmdInput').value.trim();
-  const args_raw = document.getElementById('argsInput').value.trim();
-  const box  = document.getElementById('result');
+  const args_raw = argsEditor.getValue().trim();
   if (!cmd) { 
-    box.innerHTML = '<div class="json-content">please enter a command</div>';
+    resultEditor.setOption('readOnly', false);
+    resultEditor.setValue('please enter a command');
+    resultEditor.setOption('readOnly', true);
     return;
   }
   
   // Check if command is disabled in config
   if (commandConfig[cmd] === false) {
-    box.classList.add('err');
-    box.innerHTML = '<div class="json-content err">Error: Command "' + cmd + '" is disabled in server configuration</div>';
+    resultEditor.setOption('readOnly', false);
+    resultEditor.setValue('ERROR: Command "' + cmd + '" is disabled in server configuration');
+    resultEditor.setOption('readOnly', true);
     return;
   }
   
@@ -1208,8 +787,9 @@ async function runCmd() {
   if (args_raw) {
     try { args = JSON.parse(args_raw); }
     catch { 
-      box.classList.add('err');
-      box.innerHTML = '<div class="json-content err">invalid JSON in args</div>';
+      resultEditor.setOption('readOnly', false);
+      resultEditor.setValue('ERROR: invalid JSON in args');
+      resultEditor.setOption('readOnly', true);
       return;
     }
   }
@@ -1234,8 +814,9 @@ async function runCmd() {
       data = JSON.parse(rawText);
     } catch (parseError) {
       // If parse fails, show raw text as error
-      box.classList.add('err');
-      box.innerHTML = '<div class="json-content err">' + escapeHtml(rawText) + '</div>';
+      resultEditor.setOption('readOnly', false);
+      resultEditor.setValue('ERROR: ' + rawText);
+      resultEditor.setOption('readOnly', true);
       saveHistory(cmd, args, false, rawText);
       renderHistory(cmd);
       return;
@@ -1246,10 +827,9 @@ async function runCmd() {
     
     // Use raw text for display and history to preserve original format
     const outputText = rawText;
-    lastRawResult = rawText;
     
-    // Render JSON tree viewer using raw text
-    renderJsonTree(rawText, 'result');
+    // Show result in CM editor
+    showResult(rawText);
     
     // Save token to localStorage when authenticated command succeeds
     // This enables auto-fill for debugging convenience
@@ -1262,8 +842,9 @@ async function runCmd() {
     renderHistory(cmd);
   } catch(e) {
     const errorText = 'fetch error: ' + e.message;
-    box.classList.add('err');
-    box.innerHTML = '<div class="json-content err">' + errorText + '</div>';
+    resultEditor.setOption('readOnly', false);
+    resultEditor.setValue('ERROR: ' + errorText);
+    resultEditor.setOption('readOnly', true);
 
     // Save failed attempt to history with error output
     saveHistory(cmd, args, false, errorText);
