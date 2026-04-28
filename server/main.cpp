@@ -4,7 +4,8 @@
 //   GET  /get/version  -> build version (timestamp + git commit)
 //   GET  /get/status   -> health check + concurrency info
 //   POST /post/run     -> body: {"cmd":"...", "args":{...}, "timeout_ms": 5000}
-//   GET  /             -> web/index.html
+//   GET  /             -> web/index.html (explicit, with 404 fallback)
+//   GET  /*            -> static files served from ./web/ (CSS, JS, images, etc.)
 //
 // Concurrency model:
 //   - Two Server instances: IPv4 (0.0.0.0) + IPv6 (::), each on its own thread
@@ -257,7 +258,7 @@ static void mount_routes(httplib::Server& svr,
     });
 
     // -------------------------------------------------------------------------
-    // GET /  (static GUI)
+    // GET /  (serve web/index.html with friendly 404 fallback)
     // -------------------------------------------------------------------------
     svr.Get("/", [&logger](const httplib::Request& req, httplib::Response& res)
     {
@@ -274,6 +275,13 @@ static void mount_routes(httplib::Server& svr,
         res.status = status;
         logger.log_request("GET", "/", client_ip, "", status, "[HTML " + std::to_string(html.size()) + " bytes]");
     });
+
+    // -------------------------------------------------------------------------
+    // Static file serving: GET /*, served from ./web/
+    // Explicit routes above take priority; this handles all other static assets
+    // (CSS, JS, images, etc.) under web/.
+    // -------------------------------------------------------------------------
+    svr.set_mount_point("/", "web");
 }
 
 // ---------------------------------------------------------------------------
