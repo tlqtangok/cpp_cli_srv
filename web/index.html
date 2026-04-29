@@ -125,6 +125,27 @@
 /* result editor: slightly larger min-height */
 #resultEditorDiv .CodeMirror { min-height: 300px; }
 #resultEditorDiv .CodeMirror-scroll { min-height: 300px; }
+
+/* fullscreen overlay for result editor */
+#resultEditorDiv.fullscreen {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; flex-direction: column;
+  background: #0f1117;
+  padding: 0;
+}
+#resultEditorDiv.fullscreen .CodeMirror {
+  flex: 1; height: 100% !important; min-height: unset !important;
+  border-radius: 0;
+}
+#resultEditorDiv.fullscreen .CodeMirror-scroll {
+  height: 100% !important; min-height: unset !important;
+}
+/* floating toolbar shown only in fullscreen (visibility controlled by JS) */
+#resultFullscreenBar {
+  display: none;
+  position: fixed; top: 8px; right: 12px; z-index: 10000;
+  gap: 6px; align-items: center;
+}
 </style>
 <!-- CodeMirror 5 -->
 <link rel="stylesheet" href="css/codemirror.min.css">
@@ -191,9 +212,17 @@
           <button class="json-btn" onclick="cmUnfoldAll(resultEditor)">📂 Unfold All</button>
         </div>
         <button class="copy-btn" onclick="copyResult(event)">📋 Copy</button>
+        <button class="copy-btn" id="resultFullscreenBtn" onclick="toggleResultFullscreen()" title="Full view (Esc to exit)">⛶ Full</button>
       </div>
     </div>
     <div id="resultEditorDiv"></div>
+    <!-- floating bar visible only in fullscreen mode -->
+    <div id="resultFullscreenBar">
+      <button class="json-btn" onclick="cmFoldAll(resultEditor)">📁 Fold</button>
+      <button class="json-btn" onclick="cmUnfoldAll(resultEditor)">📂 Unfold</button>
+      <button class="copy-btn" onclick="copyResult(event)">📋 Copy</button>
+      <button class="copy-btn" onclick="toggleResultFullscreen()" title="Exit fullscreen (Esc)">✕ Exit</button>
+    </div>
     <!-- History panel -->
     <div class="history-section" id="historySection">
       <div class="history-header" onclick="toggleHistory()" style="cursor:pointer;">
@@ -448,6 +477,7 @@ async function loadVersion() {
 async function initializeGUI() {
   initEditors();       // must be first so editors exist before any other init
   initJsonAnalysisLink();
+  initFullscreenKey();
   await loadConfig();
   await loadSchema();
   await loadVersion();
@@ -462,6 +492,28 @@ function initJsonAnalysisLink() {
       navigator.clipboard.writeText(text).catch(() => {});
     }
   });
+}
+
+function initFullscreenKey() {
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      const div = document.getElementById('resultEditorDiv');
+      if (div && div.classList.contains('fullscreen')) toggleResultFullscreen();
+    }
+  });
+}
+
+function toggleResultFullscreen() {
+  const div = document.getElementById('resultEditorDiv');
+  const bar = document.getElementById('resultFullscreenBar');
+  const btn = document.getElementById('resultFullscreenBtn');
+  if (!div) return;
+  const entering = !div.classList.contains('fullscreen');
+  div.classList.toggle('fullscreen', entering);
+  if (bar) bar.style.display = entering ? 'flex' : 'none';
+  if (btn) btn.textContent = entering ? '⊠ Restore' : '⛶ Full';
+  if (resultEditor) resultEditor.refresh();
+  if (entering && resultEditor) resultEditor.focus();
 }
 
 function initEditors() {
