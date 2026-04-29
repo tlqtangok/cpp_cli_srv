@@ -184,7 +184,7 @@
       <label style="color:#718096;font-size:.8rem">Ctrl+Enter to run</label>
     </div>
     <div class="curl-label">
-      <label>Result</label>
+      <label>Result <a id="jsonAnalysisLink" href="https://www.toolhelper.cn/JSON/JSONFormat" target="_blank" title="Open in JSON Formatter (toolhelper.cn)" style="margin-left:6px;text-decoration:none;font-size:.85rem;vertical-align:middle;opacity:.75;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.75">🔗</a></label>
       <div style="display:flex;gap:8px;">
         <div class="json-tools">
           <button class="json-btn" onclick="cmFoldAll(resultEditor)">📁 Fold All</button>
@@ -447,9 +447,21 @@ async function loadVersion() {
 
 async function initializeGUI() {
   initEditors();       // must be first so editors exist before any other init
+  initJsonAnalysisLink();
   await loadConfig();
   await loadSchema();
   await loadVersion();
+}
+
+function initJsonAnalysisLink() {
+  const link = document.getElementById('jsonAnalysisLink');
+  if (!link) return;
+  link.addEventListener('click', function() {
+    const text = resultEditor ? resultEditor.getValue().trim() : '';
+    if (text) {
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+  });
 }
 
 function initEditors() {
