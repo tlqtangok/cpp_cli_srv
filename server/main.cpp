@@ -138,7 +138,8 @@ static void mount_routes(httplib::Server& svr,
                          std::atomic<int>& active,
                          size_t           threads,
                          Logger&          logger,
-                         const std::string& token)
+                         const std::string& token,
+                         const std::string& web_path)
 {
     // -------------------------------------------------------------------------
     // GET /get/schema
@@ -260,14 +261,14 @@ static void mount_routes(httplib::Server& svr,
     // -------------------------------------------------------------------------
     // GET /  (serve web/index.html with friendly 404 fallback)
     // -------------------------------------------------------------------------
-    svr.Get("/", [&logger](const httplib::Request& req, httplib::Response& res)
+    svr.Get("/", [&logger, web_path](const httplib::Request& req, httplib::Response& res)
     {
         std::string client_ip = get_client_ip(req);
-        std::string html = load_file("web/index.html");
+        std::string html = load_file(web_path + "/index.html");
         int status = 200;
         if (html.empty()) 
         {
-            html = "<h1>web/index.html not found</h1>";
+            html = "<h1>" + web_path + "/index.html not found</h1>";
             status = 404;
         }
         res.set_header("Access-Control-Allow-Origin", "*");
@@ -277,11 +278,11 @@ static void mount_routes(httplib::Server& svr,
     });
 
     // -------------------------------------------------------------------------
-    // Static file serving: GET /*, served from ./web/
+    // Static file serving: GET /*, served from web_path
     // Explicit routes above take priority; this handles all other static assets
-    // (CSS, JS, images, etc.) under web/.
+    // (CSS, JS, images, etc.) under web_path.
     // -------------------------------------------------------------------------
-    svr.set_mount_point("/", "web");
+    svr.set_mount_point("/", web_path);
 }
 
 // ---------------------------------------------------------------------------
@@ -333,6 +334,7 @@ int main(int argc, char* argv[])
     std::string logfile     = "";
     std::string token       = "your_token";   // Default token for security
     std::string ssl_dir     = "";             // SSL certificate directory
+    std::string web_path    = "web";          // Web files directory
 
     for (int i = 1; i < argc; ++i)
     {
@@ -344,6 +346,7 @@ int main(int argc, char* argv[])
         else if (flag == "--log"        && i+1 < argc) logfile    = argv[++i];
         else if (flag == "--token"      && i+1 < argc) token      = argv[++i];
         else if (flag == "--ssl"        && i+1 < argc) ssl_dir    = argv[++i];
+        else if (flag == "--web"        && i+1 < argc) web_path   = argv[++i];
         else if (flag == "-v" || flag == "--version")
         {
             std::cout << "cpp_srv " << VERSION << "\n";
@@ -361,6 +364,7 @@ int main(int argc, char* argv[])
                       << "  --no-ipv6             Disable IPv6 server (IPv4 only)\n"
                       << "  --log <file>          Enable logging to file\n"
                       << "  --token <string>      Security token for call_shell command (min 2 chars, alphanumeric + underscore)\n"
+                      << "  --web <path>          Path to web files directory (default: web)\n"
                       << "  -v, --version         Show version (build time + git commit)\n"
                       << "  -h, --help            Show this help message\n\n"
                       << "Examples:\n"
@@ -435,7 +439,7 @@ int main(int argc, char* argv[])
 
     // --- IPv4 server --------------------------------------------------------
     httplib::Server* svr4 = make_server(threads);
-    mount_routes(*svr4, e, active, threads, logger, token);
+    mount_routes(*svr4, e, active, threads, logger, token, web_path);
 
     if (!svr4->bind_to_port("0.0.0.0", port))
     {
@@ -460,7 +464,7 @@ int main(int argc, char* argv[])
         svr6 = make_server(threads);
         // IPV6_V6ONLY = true: bind only IPv6, don't overlap with IPv4
         svr6->set_ipv6_v6only(true);
-        mount_routes(*svr6, e, active, threads, logger, token);
+        mount_routes(*svr6, e, active, threads, logger, token, web_path);
 
         if (!svr6->bind_to_port("::", port))
         {
@@ -503,7 +507,7 @@ int main(int argc, char* argv[])
         svr_https4->set_read_timeout(5, 0);
         svr_https4->set_write_timeout(5, 0);
         svr_https4->set_payload_max_length(MAX_BODY_BYTES);
-        mount_routes(*svr_https4, e, active, threads, logger, token);
+        mount_routes(*svr_https4, e, active, threads, logger, token, web_path);
         
         if (!svr_https4->bind_to_port("0.0.0.0", port_https))
         {
@@ -533,7 +537,7 @@ int main(int argc, char* argv[])
             svr_https6->set_write_timeout(5, 0);
             svr_https6->set_payload_max_length(MAX_BODY_BYTES);
             svr_https6->set_ipv6_v6only(true);
-            mount_routes(*svr_https6, e, active, threads, logger, token);
+            mount_routes(*svr_https6, e, active, threads, logger, token, web_path);
             
             if (!svr_https6->bind_to_port("::", port_https))
             {
@@ -614,7 +618,8 @@ int main(int argc, char* argv[])
         std::cout << "  Log     : " << logfile << "\n";
     if (port_https > 0)
         std::cout << "  SSL     : " << ssl_dir << "\n";
-    std::cout << "  Press Ctrl+C to stop.\n";
+    std::cout << "  Web     : " << web_path << "\n"
+              << "  Press Ctrl+C to stop.\n";
 
     // --- Block main thread until servers exit ------------------------------
     t4.join();
