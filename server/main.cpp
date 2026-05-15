@@ -4,7 +4,7 @@
 //   GET  /get/version  -> build version (timestamp + git commit)
 //   GET  /get/status   -> health check + concurrency info
 //   POST /post/run     -> body: {"cmd":"...", "args":{...}, "timeout_ms": 5000}
-//   GET  /             -> web/index.html (explicit, with 404 fallback)
+//   GET  /             -> web/index.html if present, else directory listing of web/
 //   GET  /*            -> static files served from ./web/ (CSS, JS, images, etc.)
 //
 // Concurrency model:
@@ -101,6 +101,72 @@ static std::string load_file(const std::string& path)
     std::ostringstream ss;
     ss << f.rdbuf();
     return ss.str();
+}
+
+// Generate an httpd-style directory listing HTML for the given directory.
+static std::string generate_dir_listing(const std::string& dir_path, const std::string& url_path)
+{
+    namespace fs = std::filesystem;
+    std::ostringstream html;
+    html << "<!DOCTYPE html>\n<html>\n<head>\n"
+         << "<meta charset=\"utf-8\">\n"
+         << "<title>Index of " << url_path << "</title>\n"
+         << "<style>\n"
+         << "body{font-family:monospace;margin:2em;}\n"
+         << "h1{border-bottom:1px solid #aaa;padding-bottom:.3em;}\n"
+         << "table{border-collapse:collapse;width:100%;}\n"
+         << "th{text-align:left;border-bottom:1px solid #ccc;padding:.3em .8em;}\n"
+         << "td{padding:.2em .8em;}\n"
+         << "tr:hover td{background:#f0f0f0;}\n"
+         << "a{text-decoration:none;color:#0645ad;}\n"
+         << "a:hover{text-decoration:underline;}\n"
+         << ".size{text-align:right;}\n"
+         << "</style>\n</head>\n<body>\n"
+         << "<h1>Index of " << url_path << "</h1>\n"
+         << "<table>\n"
+         << "<tr><th>Name</th><th class=\"size\">Size</th><th>Last Modified</th></tr>\n";
+
+    std::vector<fs::directory_entry> entries;
+    std::error_code ec;
+    for (auto& e : fs::directory_iterator(dir_path, ec))
+        entries.push_back(e);
+    if (!ec)
+    {
+        std::sort(entries.begin(), entries.end(), [](const fs::directory_entry& a, const fs::directory_entry& b){
+            if (a.is_directory() != b.is_directory()) return a.is_directory() > b.is_directory();
+            return a.path().filename() < b.path().filename();
+        });
+        for (auto& e : entries)
+        {
+            std::string name = e.path().filename().string();
+            bool is_dir = e.is_directory(ec);
+            std::string display = is_dir ? name + "/" : name;
+            std::string href    = is_dir ? name + "/" : name;
+            std::string size_str = "-";
+            if (!is_dir) {
+                auto sz = e.file_size(ec);
+                if (!ec) size_str = std::to_string(sz);
+            }
+            // Last modified time
+            std::string mtime_str = "-";
+            auto lwt = e.last_write_time(ec);
+            if (!ec) {
+                auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                    lwt - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
+                std::time_t t = std::chrono::system_clock::to_time_t(sctp);
+                char buf[32];
+                std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", std::gmtime(&t));
+                mtime_str = buf;
+            }
+            html << "<tr>"
+                 << "<td><a href=\"" << href << "\">" << display << "</a></td>"
+                 << "<td class=\"size\">" << size_str << "</td>"
+                 << "<td>" << mtime_str << "</td>"
+                 << "</tr>\n";
+        }
+    }
+    html << "</table>\n</body>\n</html>\n";
+    return html.str();
 }
 
 static void cors(httplib::Response& res)
@@ -259,17 +325,16 @@ static void mount_routes(httplib::Server& svr,
     });
 
     // -------------------------------------------------------------------------
-    // GET /  (serve web/index.html with friendly 404 fallback)
+    // GET /  (serve web/index.html if present, else httpd-style directory listing)
     // -------------------------------------------------------------------------
     svr.Get("/", [&logger, web_path](const httplib::Request& req, httplib::Response& res)
     {
         std::string client_ip = get_client_ip(req);
         std::string html = load_file(web_path + "/index.html");
         int status = 200;
-        if (html.empty()) 
+        if (html.empty())
         {
-            html = "<h1>" + web_path + "/index.html not found</h1>";
-            status = 404;
+            html = generate_dir_listing(web_path, "/");
         }
         res.set_header("Access-Control-Allow-Origin", "*");
         res.set_content(html, "text/html; charset=utf-8");
