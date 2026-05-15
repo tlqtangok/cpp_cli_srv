@@ -108,23 +108,12 @@ static std::string generate_dir_listing(const std::string& dir_path, const std::
 {
     namespace fs = std::filesystem;
     std::ostringstream html;
-    html << "<!DOCTYPE html>\n<html>\n<head>\n"
-         << "<meta charset=\"utf-8\">\n"
-         << "<title>Index of " << url_path << "</title>\n"
-         << "<style>\n"
-         << "body{font-family:monospace;margin:2em;}\n"
-         << "h1{border-bottom:1px solid #aaa;padding-bottom:.3em;}\n"
-         << "table{border-collapse:collapse;width:100%;}\n"
-         << "th{text-align:left;border-bottom:1px solid #ccc;padding:.3em .8em;}\n"
-         << "td{padding:.2em .8em;}\n"
-         << "tr:hover td{background:#f0f0f0;}\n"
-         << "a{text-decoration:none;color:#0645ad;}\n"
-         << "a:hover{text-decoration:underline;}\n"
-         << ".size{text-align:right;}\n"
-         << "</style>\n</head>\n<body>\n"
+    html << "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">\n"
+         << "<html>\n <head>\n"
+         << "  <title>Index of " << url_path << "</title>\n"
+         << " </head>\n <body>\n"
          << "<h1>Index of " << url_path << "</h1>\n"
-         << "<table>\n"
-         << "<tr><th>Name</th><th class=\"size\">Size</th><th>Last Modified</th></tr>\n";
+         << "<ul>";
 
     std::vector<fs::directory_entry> entries;
     std::error_code ec;
@@ -140,32 +129,11 @@ static std::string generate_dir_listing(const std::string& dir_path, const std::
         {
             std::string name = e.path().filename().string();
             bool is_dir = e.is_directory(ec);
-            std::string display = is_dir ? name + "/" : name;
-            std::string href    = is_dir ? name + "/" : name;
-            std::string size_str = "-";
-            if (!is_dir) {
-                auto sz = e.file_size(ec);
-                if (!ec) size_str = std::to_string(sz);
-            }
-            // Last modified time
-            std::string mtime_str = "-";
-            auto lwt = e.last_write_time(ec);
-            if (!ec) {
-                auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-                    lwt - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
-                std::time_t t = std::chrono::system_clock::to_time_t(sctp);
-                char buf[32];
-                std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", std::gmtime(&t));
-                mtime_str = buf;
-            }
-            html << "<tr>"
-                 << "<td><a href=\"" << href << "\">" << display << "</a></td>"
-                 << "<td class=\"size\">" << size_str << "</td>"
-                 << "<td>" << mtime_str << "</td>"
-                 << "</tr>\n";
+            std::string href = is_dir ? name + "/" : name;
+            html << "<li><a href=\"" << href << "\"> " << href << "</a></li>\n";
         }
     }
-    html << "</table>\n</body>\n</html>\n";
+    html << "</ul>\n</body></html>\n";
     return html.str();
 }
 
