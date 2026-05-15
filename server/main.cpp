@@ -5,7 +5,7 @@
 //   GET  /get/status   -> health check + concurrency info
 //   POST /post/run     -> body: {"cmd":"...", "args":{...}, "timeout_ms": 5000}
 //   GET  /             -> web/index.html if present, else directory listing of web/
-//   GET  /*            -> static files served from ./web/ (CSS, JS, images, etc.)
+//   GET  /*            -> static files from ./web/; directories show httpd-style listing
 //
 // Concurrency model:
 //   - Two Server instances: IPv4 (0.0.0.0) + IPv6 (::), each on its own thread
@@ -343,11 +343,66 @@ static void mount_routes(httplib::Server& svr,
     });
 
     // -------------------------------------------------------------------------
-    // Static file serving: GET /*, served from web_path
-    // Explicit routes above take priority; this handles all other static assets
-    // (CSS, JS, images, etc.) under web_path.
+    // Static file serving + directory listing: catch-all GET
+    // Handles any path under web_path:
+    //   - directory → index.html if present, else httpd-style listing
+    //   - regular file → served with correct MIME type
+    //   - missing → 404
+    // API routes registered above take priority (httplib checks in order).
     // -------------------------------------------------------------------------
-    svr.set_mount_point("/", web_path);
+    svr.Get(".*", [&logger, web_path](const httplib::Request& req, httplib::Response& res)
+    {
+        namespace fs = std::filesystem;
+        std::string client_ip = get_client_ip(req);
+        std::string rel = req.path;
+
+        // Block path traversal
+        if (rel.find("..") != std::string::npos)
+        {
+            res.set_content("Forbidden", "text/plain");
+            res.status = 403;
+            logger.log_request("GET", req.path, client_ip, "", 403, "Forbidden");
+            return;
+        }
+
+        std::string fs_path = web_path + rel;
+        std::error_code ec;
+
+        if (fs::is_directory(fs_path, ec))
+        {
+            // Redirect /test → /test/ so relative links inside work correctly
+            if (!rel.empty() && rel.back() != '/')
+            {
+                res.set_redirect(rel + "/", 301);
+                logger.log_request("GET", req.path, client_ip, "", 301, "redirect");
+                return;
+            }
+            std::string html = load_file(fs_path + "index.html");
+            if (html.empty())
+                html = generate_dir_listing(fs_path, rel);
+            res.set_header("Access-Control-Allow-Origin", "*");
+            res.set_content(html, "text/html; charset=utf-8");
+            res.status = 200;
+            logger.log_request("GET", req.path, client_ip, "", 200, "[HTML " + std::to_string(html.size()) + " bytes]");
+            return;
+        }
+
+        if (fs::is_regular_file(fs_path, ec))
+        {
+            std::string content = load_file(fs_path);
+            std::string mime = httplib::detail::find_content_type(
+                fs_path, {}, "application/octet-stream");
+            res.set_header("Access-Control-Allow-Origin", "*");
+            res.set_content(content, mime);
+            res.status = 200;
+            logger.log_request("GET", req.path, client_ip, "", 200, "[" + std::to_string(content.size()) + " bytes]");
+            return;
+        }
+
+        res.set_content("404 Not Found: " + req.path, "text/plain");
+        res.status = 404;
+        logger.log_request("GET", req.path, client_ip, "", 404, "not found");
+    });
 }
 
 // ---------------------------------------------------------------------------
